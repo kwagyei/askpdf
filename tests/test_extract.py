@@ -1,9 +1,10 @@
+import time
 from pathlib import Path
 
 import pytest
 
 from askpdf.extract.base import ExtractionError, RawPage
-from askpdf.extract.pypdf_ext import PypdfExtractor
+from askpdf.extract.pypdf_ext import PypdfExtractor, contains_inline_image
 from tests.pdfs import PageSpec, make_pdf, text_page
 
 
@@ -101,3 +102,25 @@ def test_extractor_identifies_itself() -> None:
     import pypdf
 
     assert (PypdfExtractor.name, PypdfExtractor.version) == ("pypdf", pypdf.__version__)
+
+
+@pytest.mark.parametrize(
+    ("data", "found"),
+    [
+        (b"q BI /W 1 /H 1 ID \x00 EI Q", True),
+        (b"BI\n/W 1 ID\nxyz EI", True),  # at the very start of the stream
+        (b"BT (no image) Tj ET", False),
+        (b"q BI /W 1 /H 1 EI Q", False),  # BI without ID
+        (b"(ID first) ID BI x", False),  # ID only before BI
+        (b"xBI ID", False),  # BI must be its own token
+    ],
+)
+def test_inline_image_detection(data: bytes, found: bool) -> None:
+    assert contains_inline_image(data) is found
+
+
+def test_inline_image_detection_is_linear_on_hostile_streams() -> None:
+    # The old single regex took ~35 s on 128 KB of " BI "; this is 200 KB.
+    started = time.perf_counter()
+    assert contains_inline_image(b" BI " * 50_000) is False
+    assert time.perf_counter() - started < 1.0

@@ -11,7 +11,7 @@ import unicodedata
 from collections import Counter
 from collections.abc import Sequence
 
-SOFT_HYPHEN = "­"
+SOFT_HYPHEN = "\u00ad"
 
 # Header/footer detection (design §4): only the first and last few lines of a page are
 # candidates, and a line must recur on at least half the pages of a long-enough document.

@@ -50,13 +50,26 @@ def _has_image(resources: Any, depth: int = 0) -> bool:
 
 # An inline image (BI ... ID ... EI) painted straight into the content stream, as some
 # scanners and fax tools write them.
-_INLINE_IMAGE = re.compile(rb"(?:^|\s)BI\s.*?\sID\s", re.DOTALL)
+_BEGIN_IMAGE = re.compile(rb"(?:^|\s)BI\s")
+_IMAGE_DATA = re.compile(rb"\sID\s")
+
+
+def contains_inline_image(data: bytes) -> bool:
+    """True if a ``BI`` operator is followed somewhere by ``ID``.
+
+    Two linear searches instead of one ``BI.*?ID`` pattern: that pattern rescans to the
+    end of the stream from every ``BI`` without an ``ID``, which is quadratic, and a
+    crafted page full of " BI " would hold the indexer (and the GIL) for minutes. If no
+    ``ID`` follows the first ``BI``, none follows any later one either.
+    """
+    begin = _BEGIN_IMAGE.search(data)
+    return begin is not None and _IMAGE_DATA.search(data, begin.end() - 1) is not None
 
 
 def _has_inline_image(page: Any) -> bool:
     try:
         contents = page.get_contents()
-        return contents is not None and _INLINE_IMAGE.search(contents.get_data()) is not None
+        return contents is not None and contains_inline_image(contents.get_data())
     except Exception:
         return False  # an unreadable content stream also fails text extraction
 

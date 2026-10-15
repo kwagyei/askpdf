@@ -46,6 +46,8 @@ Questions written by people who had not seen the answer (Qasper) complement the 
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.
   Extractors are compared on hand-transcribed pages before v0.1.
 - PDFs that need a password, and AES-encrypted ones, are skipped with the reason shown.
+- A word broken across lines at a hyphen is rejoined without it, which also glues real
+  compounds ("multi-factor" becomes "multifactor"). A fix is designed and pending.
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
   as Persian or Devanagari. The test corpus is English and Swedish.
 
