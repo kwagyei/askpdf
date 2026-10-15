@@ -1,0 +1,132 @@
+"""Test-wide guards and settings."""
+
+import ipaddress
+import os
+import socket
+from collections.abc import Iterator
+from typing import Any
+
+import pytest
+from hypothesis import settings
+
+# CI must be deterministic: same examples on every run, no example database, and no
+# per-example deadline (shared runners are too noisy for timing to mean anything).
+settings.register_profile("ci", derandomize=True, database=None, deadline=None, print_blob=True)
+settings.register_profile("dev", max_examples=200)
+_in_ci = os.environ.get("CI", "").lower() in {"1", "true"}
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci" if _in_ci else "dev"))
+
+
+class NetworkBlockedError(RuntimeError):
+    """Raised when a test tries to reach a non-loopback address."""
+
+
+def is_loopback_host(host: object) -> bool:
+    """True for names and literals that can only mean this machine."""
+    if isinstance(host, bytes):
+        host = host.decode("ascii", "replace")
+    if not isinstance(host, str):
+        return False
+    if host.lower().rstrip(".") == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    # Decided here rather than left to the stdlib, whose answer for IPv4-mapped
+    # addresses has changed between Python versions.
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped.is_loopback
+    return ip.is_loopback
+
+
+def is_loopback_address(address: Any) -> bool:
+    """True for socket addresses that never leave the machine."""
+    if isinstance(address, tuple) and address:
+        return is_loopback_host(address[0])
+    # AF_UNIX paths never leave the machine.
+    return isinstance(address, str | bytes)
+
+
+def _check(address: Any) -> None:
+    if not is_loopback_address(address):
+        raise NetworkBlockedError(f"test tried to reach {address!r}")
+
+
+_real_connect = socket.socket.connect
+_real_connect_ex = socket.socket.connect_ex
+_real_sendto = socket.socket.sendto
+_real_getaddrinfo = socket.getaddrinfo
+
+
+def _guarded_connect(self: socket.socket, address: Any) -> None:
+    _check(address)
+    _real_connect(self, address)
+
+
+def _guarded_connect_ex(self: socket.socket, address: Any) -> int:
+    _check(address)
+    return _real_connect_ex(self, address)
+
+
+def _guarded_sendto(self: socket.socket, data: Any, *args: Any) -> int:
+    # sendto(data, address) or sendto(data, flags, address): the address is always last.
+    _check(args[-1])
+    return _real_sendto(self, data, *args)
+
+
+def _guarded_getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+    if host is not None and not is_loopback_host(host):
+        raise NetworkBlockedError(f"test tried to resolve {host!r}")
+    return _real_getaddrinfo(host, *args, **kwargs)
+
+
+_GUARDS: list[tuple[Any, str, Any]] = [
+    (socket.socket, "connect", _guarded_connect),
+    (socket.socket, "connect_ex", _guarded_connect_ex),
+    (socket.socket, "sendto", _guarded_sendto),
+    (socket, "getaddrinfo", _guarded_getaddrinfo),
+]
+if hasattr(socket.socket, "sendmsg"):  # not on Windows
+
+    def _guarded_sendmsg(self: socket.socket, buffers: Any, *args: Any) -> int:
+        if len(args) >= 3:
+            _check(args[2])
+        return _real_sendmsg(self, buffers, *args)
+
+    _real_sendmsg = socket.socket.sendmsg
+    _GUARDS.append((socket.socket, "sendmsg", _guarded_sendmsg))
+
+_session_patch = pytest.MonkeyPatch()
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Block the network for the whole run: imports, collection and every fixture scope.
+
+    No test may reach a model, arXiv or a remote API; they are faked. Loopback stays
+    open for the local HTTP servers that provider tests start. One known gap: on
+    Windows, asyncio's proactor loop connects through ConnectEx and bypasses
+    socket.connect. askpdf's own HTTP client is synchronous (urllib), so this does
+    not affect it.
+    """
+    for target, name, guard in _GUARDS:
+        _session_patch.setattr(target, name, guard)
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    _session_patch.undo()
+
+
+@pytest.fixture(autouse=True)
+def _allow_network_if_marked(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Lift the guard for a single test marked ``@pytest.mark.network``."""
+    if request.node.get_closest_marker("network"):
+        monkeypatch.setattr(socket.socket, "connect", _real_connect)
+        monkeypatch.setattr(socket.socket, "connect_ex", _real_connect_ex)
+        monkeypatch.setattr(socket.socket, "sendto", _real_sendto)
+        monkeypatch.setattr(socket, "getaddrinfo", _real_getaddrinfo)
+        if hasattr(socket.socket, "sendmsg"):
+            monkeypatch.setattr(socket.socket, "sendmsg", _real_sendmsg)
+    yield

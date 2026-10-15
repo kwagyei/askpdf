@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "askpdf"
+version = "0.1.0.dev0"
+description = "Ask questions about a folder of PDFs; answers cite the page, verified word for word."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Kwabena Sasu-Boakye", email = "kwabenasasuboakye@gmail.com" }]
+keywords = ["rag", "pdf", "retrieval", "citations", "ollama", "evaluation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Text Processing :: Indexing",
+    "Typing :: Typed",
+]
+# Runtime dependencies are deliberately few (ADR-0001). Everything else is stdlib.
+dependencies = [
+    "pypdf>=6.0",
+    "numpy>=2.5",  # the reason for the >=3.12 floor
+    "fastapi>=0.120",
+    "uvicorn>=0.38",
+]
+
+[project.urls]
+Homepage = "https://github.com/kwagyei/askpdf"
+Issues = "https://github.com/kwagyei/askpdf/issues"
+
+[project.scripts]
+askpdf = "askpdf.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9",
+    "pytest-cov>=7",
+    "ruff>=0.17",
+    "mypy>=2.0",
+    "hypothesis>=6.150",
+    "httpx>=0.28",                 # FastAPI TestClient
+    "pytrec-eval-terrier>=0.5.10", # reference implementation the metrics are checked against
+]
+# Tools for building and inspecting the evaluation data; not needed to run askpdf.
+eval = [
+    "jiwer>=4.0",     # character error rate
+    "pdfplumber>=0.11", # extractor comparison (ADR-0002)
+    "pypdfium2>=5.0",   # extractor comparison and page rendering
+    "rapidfuzz>=3.14",  # Qasper paragraph-to-page mapping
+]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["askpdf"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+markers = ["network: allowed to open non-loopback connections (none should need it)"]
+xfail_strict = true
+
+[tool.coverage.run]
+source = ["askpdf"]
+branch = true
+
+[tool.coverage.paths]
+# Tests run against the installed package; report it under src/.
+source = ["src/askpdf", "*/site-packages/askpdf"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = ['if __name__ == "__main__":']
