@@ -28,7 +28,7 @@ classifiers = [
 # Runtime dependencies are deliberately few (ADR-0001). Everything else is stdlib.
 dependencies = [
     "pypdf>=6.0",
-    "numpy>=2.3",
+    "numpy>=2.5",  # the reason for the >=3.12 floor
     "fastapi>=0.120",
     "uvicorn>=0.38",
 ]
@@ -89,6 +89,10 @@ xfail_strict = true
 [tool.coverage.run]
 source = ["askpdf"]
 branch = true
+
+[tool.coverage.paths]
+# Tests run against the installed package; report it under src/.
+source = ["src/askpdf", "*/site-packages/askpdf"]
 
 [tool.coverage.report]
 fail_under = 90

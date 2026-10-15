@@ -30,9 +30,12 @@ after changing `src/`.
 ## Conventions
 
 - Type hints everywhere; mypy strict covers `src` and `tests`.
-- No test reaches the network: an autouse fixture in `tests/conftest.py` blocks every
-  non-loopback connection. Models, arXiv and remote APIs are faked.
-- Hypothesis loads the derandomised `ci` profile when `CI` is set, so CI is deterministic.
+- No test reaches the network: `tests/conftest.py` patches `connect`, `connect_ex`,
+  `sendto`, `sendmsg` and `getaddrinfo` in `pytest_configure`, so imports, collection and
+  every fixture scope are covered. Loopback stays open; `@pytest.mark.network` lifts it
+  for one test. Models, arXiv and remote APIs are faked.
+- Hypothesis loads the derandomised `ci` profile (no deadline) when `CI` is 1/true;
+  `HYPOTHESIS_PROFILE` overrides it.
 - `cli.py` prints; core modules return data or yield events.
 
 ## Settled decisions (see the ADRs for the reasoning)
