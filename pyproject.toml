@@ -73,7 +73,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 known-first-party = ["askpdf"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S106"]  # assert; test PDFs use fixed passwords
 
 [tool.mypy]
 strict = true
