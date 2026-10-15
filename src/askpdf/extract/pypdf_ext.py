@@ -7,7 +7,7 @@ this is the only extractor the app uses.
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import pypdf
 from pypdf.errors import DependencyError, PdfReadError
@@ -65,9 +65,9 @@ class PypdfExtractor:
     name = "pypdf"
     version = pypdf.__version__
 
-    def extract(self, path: Path) -> list[RawPage]:
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
         try:
-            reader = pypdf.PdfReader(path)
+            reader = pypdf.PdfReader(source)
             if reader.is_encrypted and not reader.decrypt(""):
                 raise ExtractionError("encrypted with a password")
             labels = reader.page_labels

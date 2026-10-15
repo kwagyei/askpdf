@@ -1,11 +1,13 @@
 """Edge cases for scanning, the store and the CLI (tester, PR 2)."""
 
+import hashlib
 import os
 import sqlite3
 import sys
 import unicodedata
 from collections.abc import Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
@@ -343,23 +345,28 @@ def test_file_deleted_after_listing_is_settled_next_run(tmp_path: Path, store: S
 
 
 class RewritingExtractor(PypdfExtractor):
-    """Replaces the file after it was hashed and before it is read."""
+    """Rewrites the file on disk while askpdf is extracting the bytes it already read."""
 
-    def __init__(self, new_text: str) -> None:
+    def __init__(self, target: Path, new_text: str) -> None:
+        self.target = target
         self.new_text = new_text
 
-    def extract(self, path: Path) -> list[RawPage]:
-        make_pdf(path, [text_page(self.new_text)])
-        return super().extract(path)
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
+        make_pdf(self.target, [text_page(self.new_text)])
+        return super().extract(source)
 
 
-def test_file_rewritten_between_hash_and_read_heals_on_the_next_run(
+def test_file_rewritten_during_extraction_keeps_text_and_hash_consistent(
     tmp_path: Path, store: Store
 ) -> None:
     root = tmp_path / "f"
-    make_pdf(root / "a.pdf", [text_page("Old text.")])
-    index_folder(root, store, RewritingExtractor("New text."), PARAMS)
-    run(root, store)
+    old = make_pdf(root / "a.pdf", [text_page("Old text.")])
+    old_sha = hashlib.sha256(old.read_bytes()).hexdigest()
+    index_folder(root, store, RewritingExtractor(old, "New text."), PARAMS)
+    [doc] = store.documents()
+    # The text stored is the text of the bytes that were hashed, never a mix.
+    assert doc.sha256 == old_sha and store.pages(doc.sha256)[0].text == "Old text."
+    run(root, store)  # the rewrite is picked up on the next run
     [doc] = store.documents()
     assert store.pages(doc.sha256)[0].text == "New text."
     _assert_consistent(store.path)

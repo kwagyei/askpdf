@@ -1,3 +1,5 @@
+import unicodedata
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -99,3 +101,13 @@ def test_empty_pages_are_handled() -> None:
     flags = detect_boilerplate(pages)
     assert flags[0] == set() and flags[4] == set()
     assert all(0 in f for f in flags[1:4])
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["e‍́", "e­́", "ᄀ​ᅡ"],  # reviewer's counterexamples
+)
+def test_removing_invisible_characters_leaves_composed_text(raw: str) -> None:
+    once = clean_text(raw)
+    assert clean_text(once) == once
+    assert once == unicodedata.normalize("NFC", once)

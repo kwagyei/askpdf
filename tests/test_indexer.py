@@ -1,7 +1,9 @@
 import os
 import shutil
+import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
 
@@ -52,11 +54,11 @@ def test_second_run_on_an_unchanged_folder_is_a_no_op(folder: Path, store: Store
 
 class CountingExtractor(PypdfExtractor):
     def __init__(self) -> None:
-        self.calls: list[Path] = []
+        self.calls: list[Path | BinaryIO] = []
 
-    def extract(self, path: Path) -> list[RawPage]:
-        self.calls.append(path)
-        return super().extract(path)
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
+        self.calls.append(source)
+        return super().extract(source)
 
 
 def test_rename_is_recorded_without_re_extracting(folder: Path, store: Store) -> None:
@@ -192,7 +194,7 @@ def test_a_single_non_pdf_yields_nothing(tmp_path: Path) -> None:
 
 
 class FlakyExtractor(PypdfExtractor):
-    def extract(self, path: Path) -> list[RawPage]:
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
         raise ExtractionError("boom")
 
 
@@ -220,3 +222,67 @@ def test_whole_pipeline_on_a_scanned_document(tmp_path: Path, store: Store) -> N
     run(tmp_path / "f", store)
     [doc] = store.documents()
     assert doc.n_image_only == 3 and doc.looks_scanned
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="POSIX permissions")
+def test_listable_but_unsearchable_folder_does_not_crash(folder: Path, store: Store) -> None:
+    sub = folder / "locked"
+    make_pdf(sub / "c.pdf", [text_page("Charlie.")])
+    sub.chmod(0o644)  # can list names, cannot open or stat the files
+    try:
+        report = run(folder, store)
+    finally:
+        sub.chmod(0o755)
+    assert sorted(report.added) == ["a.pdf", "sub/b.pdf"]
+    assert "locked/c.pdf" in report.failed
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="POSIX permissions")
+def test_indexed_file_that_becomes_unreadable_keeps_its_document(
+    folder: Path, store: Store
+) -> None:
+    run(folder, store)
+    target = folder / "a.pdf"
+    st = target.stat()
+    os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))  # looks changed
+    target.chmod(0)
+    try:
+        report = run(folder, store)
+    finally:
+        target.chmod(0o644)
+    assert "a.pdf" in report.out_of_reach and not report.failed
+    assert any(d.paths == ("a.pdf",) for d in store.documents())
+
+
+def test_unexpected_pypdf_errors_fail_only_that_file(
+    folder: Path, store: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pypdf
+
+    real = pypdf.PageObject.extract_text
+
+    def boom(self: pypdf.PageObject, *args: object, **kwargs: object) -> str:
+        if "Bravo" in real(self):
+            raise KeyError("/Font")  # the kind of thing a malformed PDF triggers
+        return real(self)
+
+    monkeypatch.setattr(pypdf.PageObject, "extract_text", boom)
+    report = run(folder, store)
+    assert report.added == ["a.pdf"]
+    assert report.failed["sub/b.pdf"].startswith("cannot read PDF: KeyError")
+
+
+def test_file_that_vanishes_before_it_is_read_is_skipped(
+    folder: Path, store: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_scan = scan
+
+    def scan_then_delete(*args: object, **kwargs: object) -> Iterator[tuple[str, Path]]:
+        for rel, path in real_scan(*args, **kwargs):  # type: ignore[arg-type]
+            if rel == "a.pdf":
+                path.unlink()
+            yield rel, path
+
+    monkeypatch.setattr("askpdf.indexer.scan", scan_then_delete)
+    report = run(folder, store)
+    assert report.added == ["sub/b.pdf"] and not report.failed

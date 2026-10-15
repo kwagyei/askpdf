@@ -19,7 +19,13 @@ from askpdf import __version__
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import index_folder
-from askpdf.store import NotAnIndexError, Store, WrongFolderError, default_index_path
+from askpdf.store import (
+    NotAnIndexError,
+    Store,
+    WrongFolderError,
+    default_index_path,
+    folder_key,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -108,6 +114,8 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, f"cannot list {args.path}; the index was left as it was")
     for folder in report.unreadable:
         print(f"skipped unreadable folder {shown(folder)} (its files stay indexed)", file=err)
+    for rel, reason in sorted(report.out_of_reach.items()):
+        print(f"skipped {shown(rel)}: {shown(reason)} (kept from the last run)", file=err)
     parts = [
         f"{len(report.added)} added",
         f"{len(report.reused)} already known (copies or renames)",
@@ -128,6 +136,10 @@ def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     if store is None:
         return 1
     with store:
+        try:
+            store.check_folder(folder_key(args.path))
+        except WrongFolderError as exc:
+            return _error(err, exc)
         documents = store.documents()
         failed = [f for f in store.files().values() if f.status == "failed"]
     if not documents and not failed:

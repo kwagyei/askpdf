@@ -1,5 +1,6 @@
 import os
 import runpy
+import sqlite3
 import sys
 from importlib.metadata import version
 from pathlib import Path
@@ -187,3 +188,26 @@ def test_index_in_an_unwritable_place_is_a_clean_error(
 )
 def test_shown_escapes_invisible_characters(name: str, expected: str) -> None:
     assert shown(name) == expected
+
+
+def test_docs_refuses_another_folders_index(
+    folder: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    idx = str(tmp_path / "idx" / "i.db")
+    main(["index", str(folder), "--index", idx])
+    other = tmp_path / "other"
+    other.mkdir()
+    capsys.readouterr()
+    assert main(["docs", str(other), "--index", idx]) == 1
+    assert "is the index of" in capsys.readouterr().err
+
+
+def test_other_database_errors_are_clean(
+    folder: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def broken(*_args: object, **_kwargs: object) -> None:
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr("askpdf.cli.index_folder", broken)
+    assert main(_args(folder, "index")) == 1
+    assert "askpdf: error: index error: disk I/O error" in capsys.readouterr().err

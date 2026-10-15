@@ -14,7 +14,7 @@ import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 SCHEMA_VERSION = 1
@@ -79,18 +79,32 @@ def cache_dir(
         local = env.get("LOCALAPPDATA")
         return Path(local) if local else home / "AppData" / "Local"
     xdg = env.get("XDG_CACHE_HOME")
-    # The XDG spec says a relative value is invalid and must be ignored.
-    return Path(xdg) if xdg and Path(xdg).is_absolute() else home / ".cache"
+    # The XDG spec says a relative value is invalid and must be ignored. Judged by POSIX
+    # rules, so the check means the same whichever OS runs it.
+    return Path(xdg) if xdg and PurePosixPath(xdg).is_absolute() else home / ".cache"
 
 
-def folder_key(root: Path, platform: str = sys.platform) -> str:
+def _same_file(a: str, b: str) -> bool:
+    try:
+        return a != b and os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def folder_key(root: Path) -> str:
     """One spelling per folder, so ``~/Docs`` and ``~/docs`` share an index.
 
-    macOS and Windows filesystems are case-insensitive by default, and macOS treats NFC
-    and NFD spellings of a name as the same file, but ``resolve()`` canonicalises neither.
+    ``resolve()`` canonicalises neither case nor Unicode normalisation. Rather than
+    guess from the OS, ask the filesystem: case is folded only if the swapped-case
+    spelling opens the same folder, so a case-sensitive volume keeps ``A`` and ``a``
+    apart. The same goes for NFC and NFD spellings.
     """
-    key = unicodedata.normalize("NFC", str(root.resolve()))
-    return key.casefold() if platform in ("darwin", "win32") else key
+    path = str(root.resolve())
+    nfc = unicodedata.normalize("NFC", path)
+    if nfc != path and not _same_file(nfc, path):
+        nfc = path  # a normalisation-sensitive filesystem: keep the name as it is
+    swapped = nfc.swapcase()
+    return nfc.casefold() if _same_file(swapped, nfc) else nfc
 
 
 def default_index_path(root: Path, cache: Path | None = None) -> Path:
@@ -161,51 +175,64 @@ def _connect(path: Path) -> sqlite3.Connection:
 def _is_askpdf_index(db: sqlite3.Connection) -> bool:
     try:
         row = db.execute("SELECT value FROM meta WHERE key = 'app'").fetchone()
-    except sqlite3.DatabaseError:
-        return False
-    return row is not None and json.loads(row[0]) == "askpdf"
+        return row is not None and json.loads(row[0]) == "askpdf"
+    except (sqlite3.DatabaseError, ValueError, TypeError):
+        return False  # another app's table, or values that are not our JSON
 
 
 class Store:
     def __init__(self, path: Path) -> None:
         if path.is_dir():
             raise NotAnIndexError(f"{path} is a directory, not an index file")
-        existed = path.exists()
-        path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._create(path)
         self._db = _connect(path)
         try:
             version = self._db.execute("PRAGMA user_version").fetchone()[0]
-            tables = self._db.execute("SELECT count(*) FROM sqlite_master").fetchone()[0]
+            ours = _is_askpdf_index(self._db)
         except sqlite3.DatabaseError as exc:
             self._db.close()
             raise NotAnIndexError(f"{path} is not an askpdf index") from exc
-        if version == SCHEMA_VERSION and _is_askpdf_index(self._db):
-            return
-        if existed and not _is_askpdf_index(self._db):
+        if not ours:
             # Includes empty and 1-byte files, which SQLite would happily treat as a new
             # database: only a file askpdf creates itself is ever written.
             self._db.close()
             raise NotAnIndexError(f"{path} is not an askpdf index; refusing to overwrite it")
-        if tables:
+        if version != SCHEMA_VERSION:
             # An index from another schema version. It is a cache of the folder, so it is
             # replaced, never migrated.
             self._db.close()
-            for suffix in ("", "-wal", "-shm"):
-                Path(f"{path}{suffix}").unlink(missing_ok=True)
+            self._create(path)
             self._db = _connect(path)
-        self._create()
 
-    def _create(self) -> None:
-        self._db.execute("PRAGMA journal_mode = WAL")
-        with self.transaction():
+    @staticmethod
+    def _create(path: Path) -> None:
+        """Build the index in a temporary file and move it into place.
+
+        A crash or Ctrl-C halfway leaves only the temporary file, never a half-made
+        index that later runs would refuse as "not an askpdf index".
+        """
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        tmp.unlink(missing_ok=True)
+        db = sqlite3.connect(tmp, isolation_level=None)
+        try:
+            db.execute("BEGIN")
             # Statement by statement: executescript() would commit the open transaction.
             for statement in _SCHEMA.split(";"):
                 if statement.strip():
-                    self._db.execute(statement)
-            self._set_meta("app", "askpdf")
-            self._set_meta("generation", 0)
-            self._db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+                    db.execute(statement)
+            for key, value in (("app", "askpdf"), ("generation", 0)):
+                db.execute("INSERT INTO meta VALUES (?, ?)", (key, json.dumps(value)))
+            db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            db.execute("COMMIT")
+            db.execute("PRAGMA journal_mode = WAL")
+        finally:
+            db.close()
+        for suffix in ("-wal", "-shm"):
+            Path(f"{path}{suffix}").unlink(missing_ok=True)
+        os.replace(tmp, path)
 
     def close(self) -> None:
         self._db.close()
@@ -249,11 +276,17 @@ class Store:
 
     def claim_folder(self, key: str) -> None:
         """Tie the index to one folder, so pointing it at another raises instead of wiping it."""
-        owner = self._get_meta("folder")
-        if owner is None:
-            with self.transaction():
+        with self.transaction():  # read and claim under one write lock: no race
+            owner = self._get_meta("folder")
+            if owner is None:
                 self._set_meta("folder", key)
-        elif owner != key:
+        if owner is not None and owner != key:
+            raise WrongFolderError(f"{self.path} is the index of {owner}")
+
+    def check_folder(self, key: str) -> None:
+        """Like claim_folder, for readers: raise if the index belongs to another folder."""
+        owner = self._get_meta("folder")
+        if owner is not None and owner != key:
             raise WrongFolderError(f"{self.path} is the index of {owner}")
 
     def ensure_pins(self, pins: Mapping[str, Any]) -> bool:

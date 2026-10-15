@@ -8,7 +8,7 @@ import sys
 import threading
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import pytest
 
@@ -120,11 +120,11 @@ class InterruptingExtractor(PypdfExtractor):
     def __init__(self, after: int) -> None:
         self.left = after
 
-    def extract(self, path: Path) -> list[RawPage]:
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
         if self.left == 0:
             raise KeyboardInterrupt
         self.left -= 1
-        return super().extract(path)
+        return super().extract(source)
 
 
 def test_ctrl_c_during_extraction_keeps_committed_documents(folder: Path, store: Store) -> None:

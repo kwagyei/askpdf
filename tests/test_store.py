@@ -193,3 +193,61 @@ def test_refuses_a_file_that_is_not_sqlite(tmp_path: Path) -> None:
 def test_creates_missing_parent_directories(tmp_path: Path) -> None:
     with Store(tmp_path / "deep" / "er" / "i.db") as store:
         assert store.path.exists()
+
+
+def test_foreign_meta_values_that_are_not_json_are_refused(tmp_path: Path) -> None:
+    path = tmp_path / "photos.db"
+    db = sqlite3.connect(path)
+    db.execute("CREATE TABLE meta (key TEXT, value TEXT)")
+    db.execute("INSERT INTO meta VALUES ('app', 'photos')")
+    db.commit()
+    db.close()
+    with pytest.raises(NotAnIndexError):
+        Store(path)
+
+
+def test_creation_leaves_no_temporary_files(tmp_path: Path) -> None:
+    with Store(tmp_path / "i.db"):
+        pass
+    assert sorted(p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")) == []
+
+
+def test_interrupted_creation_does_not_lock_askpdf_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "i.db"
+
+    def crash(*_args: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("askpdf.store.os.replace", crash)
+    with pytest.raises(KeyboardInterrupt):
+        Store(path)
+    monkeypatch.undo()
+    assert not path.exists()  # only a temporary file was written
+    with Store(path) as store:  # the next run starts cleanly
+        assert store.generation == 0
+
+
+def test_claiming_twice_for_the_same_folder_is_fine(tmp_path: Path) -> None:
+    from askpdf.store import WrongFolderError
+
+    with Store(tmp_path / "i.db") as store:
+        store.claim_folder("/a")
+        store.claim_folder("/a")
+        store.check_folder("/a")
+        with pytest.raises(WrongFolderError):
+            store.check_folder("/b")
+
+
+def test_folder_key_folds_case_only_where_the_filesystem_does(tmp_path: Path) -> None:
+    from askpdf.store import folder_key
+
+    folder = tmp_path / "Docs"
+    folder.mkdir()
+    other = tmp_path / "docs"
+    if other.exists():  # case-insensitive volume: one folder, one key
+        assert folder_key(folder) == folder_key(other)
+    else:  # case-sensitive: two folders, two keys
+        other.mkdir()
+        assert folder_key(folder) != folder_key(other)

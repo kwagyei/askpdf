@@ -63,7 +63,10 @@ def clean_text(text: str) -> str:
         lambda m: "" if m.string[m.end()].islower() else m.group(0),
         text,
     )
-    return _normalise_lines(text)
+    # Removing invisible characters can leave a base letter next to its combining mark;
+    # compose them, or a second pass would give different text (and quotes would not
+    # match). NFC only composes, so it cannot bring back anything removed above.
+    return unicodedata.normalize("NFC", _normalise_lines(text))
 
 
 def _signature(line: str) -> str:

@@ -27,7 +27,9 @@ pytestmark = pytest.mark.skipif(
 # F1 is waiting on an amendment to ADR-0002 (the de-hyphenation rule): the code follows
 # the accepted rule today. Strict xfail: these fail loudly once the fix lands.
 PENDING_ADR_0002 = pytest.mark.xfail(
-    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment", strict=True
+    raises=AssertionError,
+    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment",
+    strict=True,
 )
 
 

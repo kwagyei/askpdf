@@ -3,7 +3,7 @@
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 # A page with an image and fewer non-whitespace characters than this is treated as a scan.
 IMAGE_ONLY_MAX_CHARS = 20
@@ -42,6 +42,6 @@ class Extractor(Protocol):
     name: str
     version: str
 
-    def extract(self, path: Path) -> list[RawPage]:
-        """Return every page in order, or raise ExtractionError."""
+    def extract(self, source: Path | BinaryIO) -> list[RawPage]:
+        """Return every page of a file or an in-memory PDF, or raise ExtractionError."""
         ...

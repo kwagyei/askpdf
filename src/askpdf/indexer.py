@@ -10,7 +10,9 @@ plain function.
 """
 
 import hashlib
+import io
 import os
+import stat
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,6 +42,7 @@ class IndexReport:
     failed: dict[str, str] = field(default_factory=dict)
     removed: list[str] = field(default_factory=list)
     unreadable: list[str] = field(default_factory=list)  # folders that could not be listed
+    out_of_reach: dict[str, str] = field(default_factory=dict)  # indexed, unreadable now
     unchanged: int = 0
     rebuilt: bool = False
 
@@ -85,18 +88,23 @@ def scan(
             if _is_hidden(name) or not name.casefold().endswith(".pdf"):
                 continue
             path = Path(dirpath) / name
-            real = path.resolve()
-            if not real.is_relative_to(root) or not real.is_file() or real in exclude:
+            # os.path.realpath, unlike Path.resolve() on Python 3.12, never raises on a
+            # symlink loop; it returns a path that then fails the checks below.
+            real = Path(os.path.realpath(path))
+            if not real.is_relative_to(root) or real in exclude:
                 continue
+            try:
+                if not stat.S_ISREG(real.stat().st_mode):
+                    continue
+            except PermissionError:
+                pass  # yield it, so the indexer reports it instead of it vanishing
+            except OSError:
+                continue  # dangling link, symlink loop, or deleted since it was listed
             yield path.relative_to(root).as_posix(), real
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        while block := f.read(1 << 20):
-            digest.update(block)
-    return digest.hexdigest()
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def build_records(
@@ -150,32 +158,36 @@ def index_folder(
             report.failed[shown] = "file name is not valid UTF-8; rename the file"
             continue
         seen.add(rel)
-        try:
-            stat = real.stat()
-        except OSError:
-            continue  # vanished between listing and reading; the next run settles it
         previous = known.get(rel)
-        if (
-            previous is not None
-            and previous.size == stat.st_size
-            and previous.mtime_ns == stat.st_mtime_ns
-        ):
-            report.unchanged += 1
-            continue
-        if on_file is not None:
-            on_file(rel)
         try:
-            sha = sha256_file(real)
+            info = real.stat()
+            if (
+                previous is not None
+                and previous.size == info.st_size
+                and previous.mtime_ns == info.st_mtime_ns
+            ):
+                report.unchanged += 1
+                continue
+            if on_file is not None:
+                on_file(rel)
+            # Read once: the hash and the extracted text must describe the same bytes,
+            # even if the file is rewritten while we work.
+            data = real.read_bytes()
         except FileNotFoundError:
             continue  # deleted since it was listed; the next run settles it
         except OSError as exc:
+            reason = f"cannot read file: {exc.strerror or exc}"
+            if previous is not None and previous.status == "indexed":
+                # Out of reach (e.g. iCloud evicted it), not gone: keep what we have.
+                report.out_of_reach[rel] = reason
+                continue
             # Recorded so `docs` shows it, but with a modification time no real file has,
             # so it is retried next run (e.g. once iCloud has downloaded it).
-            reason = f"cannot read file: {exc.strerror or exc}"
-            store.put_file(FileRow(rel, "", stat.st_size, UNREADABLE_MTIME, "failed", reason))
+            store.put_file(FileRow(rel, "", 0, UNREADABLE_MTIME, "failed", reason))
             report.failed[rel] = reason
             continue
-        row = FileRow(rel, sha, stat.st_size, stat.st_mtime_ns, "indexed", None)
+        sha = sha256_bytes(data)
+        row = FileRow(rel, sha, info.st_size, info.st_mtime_ns, "indexed", None)
         if previous is not None and previous.sha256 == sha and previous.status == "indexed":
             store.put_file(row)  # touched but identical: only the timestamp changed
             report.unchanged += 1
@@ -185,9 +197,9 @@ def index_folder(
             report.reused.append(rel)
             continue
         try:
-            raw_pages = extractor.extract(real)
+            raw_pages = extractor.extract(io.BytesIO(data))
         except ExtractionError as exc:
-            store.put_file(FileRow(rel, sha, stat.st_size, stat.st_mtime_ns, "failed", str(exc)))
+            store.put_file(FileRow(rel, sha, info.st_size, info.st_mtime_ns, "failed", str(exc)))
             report.failed[rel] = str(exc)
             continue
         pages, chunks = build_records(raw_pages, params)

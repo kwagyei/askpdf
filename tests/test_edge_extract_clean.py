@@ -27,7 +27,9 @@ from tests.pdfs import PageSpec, make_pdf, text_page
 # F1 is waiting on an amendment to ADR-0002 (the de-hyphenation rule): the code follows
 # the accepted rule today. Strict xfail: these fail loudly once the fix lands.
 PENDING_ADR_0002 = pytest.mark.xfail(
-    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment", strict=True
+    raises=AssertionError,
+    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment",
+    strict=True,
 )
 
 
@@ -114,12 +116,19 @@ def test_line_break_inside_a_hyphenated_compound_keeps_the_hyphen(compound: str)
     ],
 )
 def test_line_end_hyphenation_variants_are_treated_alike(raw: str, expected: str) -> None:
-    # F3. Whatever the cleaner decides for "wor-\nld" it should decide for these too;
-    # today they come out as "wor\nld" or "wor-\nld", and a second pass changes them.
+    # F3. Whatever the cleaner decides for "wor-\nld" it should decide for these too.
     assert clean_text(raw) == expected
 
 
-_HYPHEN_ALPHABET = st.sampled_from(["a", "b", "-", "\n", " ", "­", "\t", "X"])
+_HYPHEN_ALPHABET = st.sampled_from(
+    # Letters, hyphens, whitespace, a soft hyphen, zero-width characters (ZWJ, ZWSP),
+    # combining marks and Hangul jamo: removing an invisible character can leave a
+    # sequence that only composes on a second pass.
+    [
+        *["a", "b", "e", "X", "-", "\n", " ", "\t"],
+        *["\u00ad", "\u200d", "\u200b", "\u0301", "\u1100", "\u1161"],
+    ]
+)
 
 
 @given(st.lists(_HYPHEN_ALPHABET, max_size=30).map("".join))
