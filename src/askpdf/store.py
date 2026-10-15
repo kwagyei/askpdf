@@ -10,6 +10,7 @@ import json
 import os
 import sqlite3
 import sys
+import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -82,12 +83,22 @@ def cache_dir(
     return Path(xdg) if xdg and Path(xdg).is_absolute() else home / ".cache"
 
 
+def folder_key(root: Path, platform: str = sys.platform) -> str:
+    """One spelling per folder, so ``~/Docs`` and ``~/docs`` share an index.
+
+    macOS and Windows filesystems are case-insensitive by default, and macOS treats NFC
+    and NFD spellings of a name as the same file, but ``resolve()`` canonicalises neither.
+    """
+    key = unicodedata.normalize("NFC", str(root.resolve()))
+    return key.casefold() if platform in ("darwin", "win32") else key
+
+
 def default_index_path(root: Path, cache: Path | None = None) -> Path:
-    """``<cache>/askpdf/<sha256(realpath)[:16]>/index.db``: never inside the folder itself.
+    """``<cache>/askpdf/<sha256(folder key)[:16]>/index.db``: never inside the folder itself.
 
     Writing a live SQLite WAL into an iCloud- or Dropbox-synced folder invites conflicts.
     """
-    key = hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:16]
+    key = hashlib.sha256(folder_key(root).encode("utf-8", "surrogateescape")).hexdigest()[:16]
     return (cache_dir() if cache is None else cache) / "askpdf" / key / "index.db"
 
 
@@ -137,6 +148,10 @@ class NotAnIndexError(Exception):
     """The file exists but was not created by askpdf; it is never overwritten."""
 
 
+class WrongFolderError(Exception):
+    """The index belongs to another folder; reusing it would wipe that folder's index."""
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     db.execute("PRAGMA foreign_keys = ON")
@@ -153,6 +168,9 @@ def _is_askpdf_index(db: sqlite3.Connection) -> bool:
 
 class Store:
     def __init__(self, path: Path) -> None:
+        if path.is_dir():
+            raise NotAnIndexError(f"{path} is a directory, not an index file")
+        existed = path.exists()
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self._db = _connect(path)
@@ -164,7 +182,9 @@ class Store:
             raise NotAnIndexError(f"{path} is not an askpdf index") from exc
         if version == SCHEMA_VERSION and _is_askpdf_index(self._db):
             return
-        if tables and not _is_askpdf_index(self._db):
+        if existed and not _is_askpdf_index(self._db):
+            # Includes empty and 1-byte files, which SQLite would happily treat as a new
+            # database: only a file askpdf creates itself is ever written.
             self._db.close()
             raise NotAnIndexError(f"{path} is not an askpdf index; refusing to overwrite it")
         if tables:
@@ -227,6 +247,15 @@ class Store:
     def _bump_generation(self) -> None:
         self._set_meta("generation", self.generation + 1)
 
+    def claim_folder(self, key: str) -> None:
+        """Tie the index to one folder, so pointing it at another raises instead of wiping it."""
+        owner = self._get_meta("folder")
+        if owner is None:
+            with self.transaction():
+                self._set_meta("folder", key)
+        elif owner != key:
+            raise WrongFolderError(f"{self.path} is the index of {owner}")
+
     def ensure_pins(self, pins: Mapping[str, Any]) -> bool:
         """Record the settings this index is built with; wipe it if they changed.
 
@@ -252,12 +281,24 @@ class Store:
         ).fetchall()
         return {row[0]: FileRow(*row) for row in rows}
 
+    def files_get(self, path: str) -> FileRow | None:
+        row = self._db.execute(
+            "SELECT path, sha256, size, mtime_ns, status, error FROM files WHERE path = ?",
+            (path,),
+        ).fetchone()
+        return None if row is None else FileRow(*row)
+
     def has_document(self, sha256: str) -> bool:
         query = "SELECT 1 FROM documents WHERE sha256 = ?"
         return self._db.execute(query, (sha256,)).fetchone() is not None
 
     def put_file(self, row: FileRow) -> None:
-        """Record a file whose document is already stored (a copy or a rename), or a failure."""
+        """Record a file whose document is already stored (a copy or a rename), or a failure.
+
+        Writing a row identical to the stored one is skipped, so re-runs stay no-ops.
+        """
+        if self.files_get(row.path) == row:
+            return
         with self.transaction():
             self._upsert_file(row)
             self._collect_garbage()

@@ -19,7 +19,7 @@ from typing import Any
 from askpdf.chunking import ChunkParams, chunk_page
 from askpdf.extract.base import ExtractionError, Extractor, RawPage
 from askpdf.extract.clean import clean_text, detect_boilerplate
-from askpdf.store import ChunkRecord, FileRow, PageRecord, Store
+from askpdf.store import ChunkRecord, FileRow, PageRecord, Store, folder_key
 
 PIN_SCHEMA = 1
 
@@ -39,6 +39,7 @@ class IndexReport:
     reused: list[str] = field(default_factory=list)  # content already indexed (copy, rename)
     failed: dict[str, str] = field(default_factory=dict)
     removed: list[str] = field(default_factory=list)
+    unreadable: list[str] = field(default_factory=list)  # folders that could not be listed
     unchanged: int = 0
     rebuilt: bool = False
 
@@ -47,30 +48,45 @@ class IndexReport:
         return bool(self.added or self.reused or self.failed or self.removed or self.rebuilt)
 
 
+# A file that could not be read at all is recorded with this modification time, which no
+# real file has, so it is retried on every run instead of being skipped as unchanged.
+UNREADABLE_MTIME = -1
+
+
 def _is_hidden(name: str) -> bool:
     # Also skips iCloud placeholders (".name.pdf.icloud") and macOS "._" resource forks.
     return name.startswith(".")
 
 
-def scan(root: Path) -> Iterator[tuple[str, Path]]:
+def scan(
+    root: Path, unreadable: list[str] | None = None, exclude: frozenset[Path] = frozenset()
+) -> Iterator[tuple[str, Path]]:
     """Yield ``(relative posix path, real path)`` for every PDF under ``root``.
 
     Symlinks are followed only when their target stays inside ``root``: the app later
     serves these files over HTTP, so nothing outside the chosen folder may get in.
+    Folders that cannot be listed are appended to ``unreadable`` ("." for the root),
+    so the caller can tell "deleted" from "temporarily out of reach".
     """
     root = root.resolve()
     if root.is_file():
-        if root.suffix.casefold() == ".pdf":
+        if root.suffix.casefold() == ".pdf" and root not in exclude:
             yield root.name, root
         return
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+
+    def on_error(exc: OSError) -> None:
+        if unreadable is not None and exc.filename is not None:
+            path = Path(exc.filename)
+            unreadable.append("." if path == root else path.relative_to(root).as_posix())
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=on_error, followlinks=False):
         dirnames[:] = sorted(d for d in dirnames if not _is_hidden(d))
         for name in sorted(filenames):
             if _is_hidden(name) or not name.casefold().endswith(".pdf"):
                 continue
             path = Path(dirpath) / name
             real = path.resolve()
-            if not real.is_relative_to(root) or not real.is_file():
+            if not real.is_relative_to(root) or not real.is_file() or real in exclude:
                 continue
             yield path.relative_to(root).as_posix(), real
 
@@ -91,12 +107,26 @@ def build_records(
     pages: list[PageRecord] = []
     chunks: list[ChunkRecord] = []
     for raw, text, flags in zip(raw_pages, cleaned, boilerplate, strict=True):
-        pages.append(PageRecord(raw.index, raw.label, text, sorted(flags), raw.image_only))
+        label = clean_text(raw.label) or str(raw.index)  # labels come from the PDF too
+        pages.append(PageRecord(raw.index, label, text, sorted(flags), raw.image_only))
         # Header and footer lines stay in the chunks: they are dropped only if that is
         # shown to help retrieval on the dev split (ADR-0002).
         for ordinal, chunk in enumerate(chunk_page(text, params)):
             chunks.append(ChunkRecord(raw.index, ordinal, chunk.start, chunk.end, chunk.text))
     return pages, chunks
+
+
+def _storable(text: str) -> bool:
+    """SQLite stores UTF-8; a non-UTF-8 filename arrives with surrogate escapes."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _under(path: str, folders: list[str]) -> bool:
+    return any(f == "." or path == f or path.startswith(f + "/") for f in folders)
 
 
 def index_folder(
@@ -106,10 +136,19 @@ def index_folder(
     params: ChunkParams,
     on_file: Callable[[str], None] | None = None,
 ) -> IndexReport:
+    store.claim_folder(folder_key(root))
     report = IndexReport(rebuilt=store.ensure_pins(pins(extractor, params)))
     known = store.files()
     seen: set[str] = set()
-    for rel, real in scan(root):
+    # The index may have been put inside the folder with --index; never index it.
+    own_files = frozenset(
+        Path(f"{store.path.resolve()}{suffix}") for suffix in ("", "-wal", "-shm", "-journal")
+    )
+    for rel, real in scan(root, report.unreadable, own_files):
+        if not _storable(rel):
+            shown = rel.encode("utf-8", "backslashreplace").decode("ascii", "backslashreplace")
+            report.failed[shown] = "file name is not valid UTF-8; rename the file"
+            continue
         seen.add(rel)
         try:
             stat = real.stat()
@@ -127,10 +166,14 @@ def index_folder(
             on_file(rel)
         try:
             sha = sha256_file(real)
+        except FileNotFoundError:
+            continue  # deleted since it was listed; the next run settles it
         except OSError as exc:
-            # Not recorded: an unreadable file (e.g. not downloaded from iCloud yet) is
-            # retried next time instead of being remembered as failed.
-            report.failed[rel] = f"cannot read file: {exc}"
+            # Recorded so `docs` shows it, but with a modification time no real file has,
+            # so it is retried next run (e.g. once iCloud has downloaded it).
+            reason = f"cannot read file: {exc.strerror or exc}"
+            store.put_file(FileRow(rel, "", stat.st_size, UNREADABLE_MTIME, "failed", reason))
+            report.failed[rel] = reason
             continue
         row = FileRow(rel, sha, stat.st_size, stat.st_mtime_ns, "indexed", None)
         if previous is not None and previous.sha256 == sha and previous.status == "indexed":
@@ -150,7 +193,8 @@ def index_folder(
         pages, chunks = build_records(raw_pages, params)
         store.put_document(row, pages, chunks)
         report.added.append(rel)
-    gone = sorted(set(known) - seen)
+    # Files in a folder that could not be listed are out of reach, not deleted.
+    gone = sorted(p for p in set(known) - seen if not _under(p, report.unreadable))
     store.remove_files(gone)
     report.removed = gone
     return report

@@ -5,6 +5,7 @@ this is the only extractor the app uses.
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,19 @@ def _has_image(resources: Any, depth: int = 0) -> bool:
     return False
 
 
+# An inline image (BI ... ID ... EI) painted straight into the content stream, as some
+# scanners and fax tools write them.
+_INLINE_IMAGE = re.compile(rb"(?:^|\s)BI\s.*?\sID\s", re.DOTALL)
+
+
+def _has_inline_image(page: Any) -> bool:
+    try:
+        contents = page.get_contents()
+        return contents is not None and _INLINE_IMAGE.search(contents.get_data()) is not None
+    except Exception:
+        return False  # an unreadable content stream also fails text extraction
+
+
 class PypdfExtractor:
     name = "pypdf"
     version = pypdf.__version__
@@ -64,7 +78,7 @@ class PypdfExtractor:
                         index=i + 1,
                         label=labels[i] if i < len(labels) else str(i + 1),
                         text=page.extract_text() or "",
-                        has_image=_has_image(page.get("/Resources")),
+                        has_image=_has_image(page.get("/Resources")) or _has_inline_image(page),
                     )
                 )
         except ExtractionError:

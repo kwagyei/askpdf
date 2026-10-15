@@ -28,28 +28,42 @@ _DIGITS = re.compile(r"\d+")
 
 
 def _drop_control(ch: str) -> str:
-    if ch in "\n\t":
+    if ch in "\n\t" or ch == SOFT_HYPHEN:  # soft hyphens are resolved below
         return ch
     category = unicodedata.category(ch)
     if category == "Cc":
         return " "
     if category == "Cf":  # zero-width and bidi marks
         return ""
+    if category == "Cs":
+        # Lone surrogates come from broken ToUnicode maps; SQLite cannot store them.
+        return "\ufffd"
     return ch
 
 
+def _normalise_lines(text: str) -> str:
+    lines = (_WHITESPACE.sub(" ", line).strip() for line in text.split("\n"))
+    return "\n".join(line for line in lines if line)
+
+
 def clean_text(text: str) -> str:
-    """Normalise one page's extracted text, keeping its line structure."""
+    """Normalise one page's extracted text, keeping its line structure.
+
+    Idempotent: cleaning cleaned text changes nothing.
+    """
     text = unicodedata.normalize("NFKC", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = text.replace(SOFT_HYPHEN, "")
     text = "".join(_drop_control(ch) for ch in text)
+    # Whitespace and blank lines go first, so "wor- \n\n ld" is handled like "wor-\nld".
+    text = _normalise_lines(text)
+    # A soft hyphen marks a place where a word may break, so at a line end it joins the
+    # word; anywhere else it is invisible and dropped.
+    text = text.replace(SOFT_HYPHEN + "\n", "").replace(SOFT_HYPHEN, "")
     text = _LINE_BREAK_HYPHEN.sub(
         lambda m: "" if m.string[m.end()].islower() else m.group(0),
         text,
     )
-    lines = (_WHITESPACE.sub(" ", line).strip() for line in text.split("\n"))
-    return "\n".join(line for line in lines if line)
+    return _normalise_lines(text)
 
 
 def _signature(line: str) -> str:

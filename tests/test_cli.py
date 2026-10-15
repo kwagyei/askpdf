@@ -1,3 +1,4 @@
+import os
 import runpy
 import sys
 from importlib.metadata import version
@@ -6,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from askpdf import __version__
-from askpdf.cli import main
+from askpdf.cli import main, shown
+from askpdf.store import Store
 from tests.pdfs import PageSpec, make_pdf, text_page
 
 
@@ -116,3 +118,72 @@ def test_default_index_lives_in_the_cache_dir(
     assert main(["index", str(folder)]) == 0
     assert f"index: {tmp_path / 'cache' / 'askpdf'}" in capsys.readouterr().err
     assert not any(p.suffix == ".db" for p in folder.rglob("*"))  # nothing written into the folder
+
+
+def test_index_of_another_folder_is_not_reused(
+    folder: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    idx = str(tmp_path / "idx" / "i.db")
+    main(["index", str(folder), "--index", idx])
+    other = tmp_path / "other"
+    make_pdf(other / "z.pdf", [text_page("Zulu.")])
+    capsys.readouterr()
+    assert main(["index", str(other), "--index", idx]) == 1
+    assert "is the index of" in capsys.readouterr().err
+    with Store(Path(idx)) as store:
+        assert "a.pdf" in store.files()  # untouched
+
+
+def test_ctrl_c_exits_130_with_a_hint(
+    folder: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def interrupt(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("askpdf.cli.index_folder", interrupt)
+    assert main(_args(folder, "index")) == 130
+    assert "run the same command again" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="POSIX permissions")
+def test_unreadable_subfolder_is_reported_not_dropped(
+    folder: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_pdf(folder / "sub" / "b.pdf", [text_page("Bravo.")])
+    main(_args(folder, "index"))
+    (folder / "sub").chmod(0)
+    try:
+        assert main(_args(folder, "index")) == 0
+    finally:
+        (folder / "sub").chmod(0o755)
+    out, err = capsys.readouterr()
+    assert "skipped unreadable folder sub" in err
+    assert out.splitlines()[-1].startswith("0 added") and "0 removed" in out
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="POSIX permissions")
+def test_unreadable_root_is_an_error(folder: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    main(_args(folder, "index"))
+    folder.chmod(0)
+    try:
+        assert main(_args(folder, "index")) == 1
+    finally:
+        folder.chmod(0o755)
+    assert "the index was left as it was" in capsys.readouterr().err
+
+
+def test_index_in_an_unwritable_place_is_a_clean_error(
+    folder: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    assert main(["index", str(folder), "--index", str(blocker / "sub" / "i.db")]) == 1
+    assert "cannot open the index" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [("plain.pdf", "plain.pdf"), ("a\nb.pdf", "a\\nb.pdf"), ("e\x1b[31m.pdf", "e\\x1b[31m.pdf")],
+)
+def test_shown_escapes_invisible_characters(name: str, expected: str) -> None:
+    assert shown(name) == expected

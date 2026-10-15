@@ -1,5 +1,6 @@
 """The page model every extractor produces (ADR-0002)."""
 
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -23,8 +24,14 @@ class RawPage:
 
     @property
     def image_only(self) -> bool:
-        visible = sum(1 for ch in self.text if not ch.isspace())
-        return self.has_image and visible < IMAGE_ONLY_MAX_CHARS
+        return self.has_image and _visible_chars(self.text) < IMAGE_ONLY_MAX_CHARS
+
+
+def _visible_chars(text: str) -> int:
+    """Characters that would show on the page: not whitespace, control or zero-width."""
+    return sum(
+        1 for ch in text if not ch.isspace() and unicodedata.category(ch) not in {"Cc", "Cf", "Cs"}
+    )
 
 
 class ExtractionError(Exception):
