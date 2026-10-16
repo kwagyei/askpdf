@@ -31,6 +31,9 @@ dependencies = [
     "numpy>=2.5",  # the reason for the >=3.12 floor
     "fastapi>=0.120",
     "uvicorn>=0.38",
+    # AES backend for pypdf, so AES-encrypted PDFs that open with an empty password can
+    # be read. Chosen over `cryptography`, which has no Intel-Mac wheels (ADR-0001).
+    "pycryptodome>=4.0",
 ]
 
 [project.urls]
@@ -56,6 +59,9 @@ eval = [
     "pdfplumber>=0.11", # extractor comparison (ADR-0002)
     "pypdfium2>=5.0",   # extractor comparison and page rendering
     "rapidfuzz>=3.14",  # Qasper paragraph-to-page mapping
+    # pdfminer.six (via pdfplumber) needs cryptography, which stopped publishing Intel-Mac
+    # wheels in 49.0.0 (ADR-0001 Amendment 1). Verified on the Intel Mac in PR 4.
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -73,7 +79,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 known-first-party = ["askpdf"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S106"]  # assert; test PDFs use fixed passwords
 
 [tool.mypy]
 strict = true
