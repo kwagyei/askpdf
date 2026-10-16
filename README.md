@@ -45,9 +45,14 @@ Questions written by people who had not seen the answer (Qasper) complement the 
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.
   Extractors are compared on hand-transcribed pages before v0.1.
-- PDFs that need a password, and AES-encrypted ones, are skipped with the reason shown.
-- A word broken across lines at a hyphen is rejoined without it, which also glues real
-  compounds ("multi-factor" becomes "multifactor"). A fix is designed and pending.
+- PDFs that need a password to open are skipped with the reason shown. PDFs that open
+  with an empty password (RC4 or AES) are read, including ones marked "no copying" or "no
+  printing": askpdf reads your own files locally and does not enforce those advisory
+  permission flags.
+- A word broken across lines at a hyphen is rejoined without the hyphen only if the same
+  document spells it solid more often than hyphenated; otherwise the hyphen stays. So
+  "multi-factor" stays a compound, but a word broken by layout that the document uses only
+  once keeps a stray hyphen ("algo-rithm"). How often that happens is measured before v0.1.
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
   as Persian or Devanagari. The test corpus is English and Swedish.
 

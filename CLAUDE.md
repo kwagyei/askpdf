@@ -10,7 +10,8 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
 
 - Python `>=3.12` (numpy 2.5 needs it); CI on ubuntu × 3.12/3.13/3.14, macOS and Windows on 3.13
 - src layout (`src/askpdf/`), hatchling, MIT; installed via `pipx install git+…`, not on PyPI
-- Runtime deps only: pypdf, numpy, fastapi, uvicorn. Everything else is stdlib.
+- Runtime deps only: pypdf, numpy, fastapi, uvicorn, pycryptodome (pypdf's AES backend;
+  `cryptography` has no Intel-Mac wheels). Everything else is stdlib.
 - Dependency groups (pip >= 25.1): `dev` (pytest, hypothesis, ruff, mypy, httpx,
   pytrec-eval-terrier) and `eval` (jiwer, pdfplumber, pypdfium2, rapidfuzz)
 - Models via Ollama's native API (llama3.2:3b, nomic-embed-text); optional BYOK chat only
@@ -41,6 +42,9 @@ after changing `src/`.
 ## Settled decisions (see the ADRs for the reasoning)
 
 - Physical page number (1-based) is canonical; chunks never cross a page.
+- Line-end hyphens are resolved per document (`clean_document`): removed only when the
+  document spells the word solid more often. Bump `CLEANING_VERSION` whenever cleaning
+  output changes; it is pinned in the index, so old indexes rebuild.
 - One SQLite index per watched folder, stored outside that folder; files keyed by SHA-256.
 - Citations carry a quote that must appear verbatim on the cited page.
 - All tuning on the dev split; the test split is frozen and scored once per release.

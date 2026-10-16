@@ -97,12 +97,18 @@ class PypdfExtractor:
         except ExtractionError:
             raise
         except DependencyError as exc:
-            # AES-encrypted files need the optional `cryptography` package.
-            raise ExtractionError(f"encrypted in a way pypdf cannot open here ({exc})") from exc
+            # pycryptodome is a runtime dependency, so this means it is missing on a
+            # platform without a wheel (ADR-0001 Amendment 1).
+            raise ExtractionError(
+                "AES-encrypted; askpdf's crypto backend (pycryptodome) is not available",
+                retry=True,
+            ) from exc
         except PdfReadError as exc:
             raise ExtractionError(f"cannot read PDF: {exc}") from exc
         except OSError as exc:
             raise ExtractionError(f"cannot open file: {exc}") from exc
+        except MemoryError as exc:
+            raise ExtractionError("ran out of memory reading this PDF", retry=True) from exc
         except Exception as exc:
             # On malformed input pypdf can raise almost anything (KeyError, IndexError,
             # RecursionError...). One bad file must fail alone, not stop the indexer.

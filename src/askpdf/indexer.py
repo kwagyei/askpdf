@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Any
 
 from askpdf.chunking import ChunkParams, chunk_page
+from askpdf.extract import clean
 from askpdf.extract.base import ExtractionError, Extractor, RawPage
-from askpdf.extract.clean import clean_text, detect_boilerplate
+from askpdf.extract.clean import clean_document, clean_text, detect_boilerplate
 from askpdf.store import ChunkRecord, FileRow, PageRecord, Store, folder_key
 
 PIN_SCHEMA = 1
@@ -31,6 +32,7 @@ def pins(extractor: Extractor, params: ChunkParams) -> dict[str, Any]:
     return {
         "pipeline": PIN_SCHEMA,
         "extractor": {"name": extractor.name, "version": extractor.version},
+        "cleaning": clean.CLEANING_VERSION,
         "chunking": {"target": params.target, "overlap": params.overlap, "snap": params.snap},
     }
 
@@ -110,7 +112,7 @@ def sha256_bytes(data: bytes) -> str:
 def build_records(
     raw_pages: list[RawPage], params: ChunkParams
 ) -> tuple[list[PageRecord], list[ChunkRecord]]:
-    cleaned = [clean_text(p.text) for p in raw_pages]
+    cleaned = clean_document([p.text for p in raw_pages])
     boilerplate = detect_boilerplate([text.split("\n") if text else [] for text in cleaned])
     pages: list[PageRecord] = []
     chunks: list[ChunkRecord] = []
@@ -199,7 +201,8 @@ def index_folder(
         try:
             raw_pages = extractor.extract(io.BytesIO(data))
         except ExtractionError as exc:
-            store.put_file(FileRow(rel, sha, info.st_size, info.st_mtime_ns, "failed", str(exc)))
+            mtime = UNREADABLE_MTIME if exc.retry else info.st_mtime_ns
+            store.put_file(FileRow(rel, sha, info.st_size, mtime, "failed", str(exc)))
             report.failed[rel] = str(exc)
             continue
         pages, chunks = build_records(raw_pages, params)

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from askpdf.chunking import ChunkParams
-from askpdf.extract.clean import clean_text
+from askpdf.extract.clean import clean_document
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import build_records, index_folder
 from askpdf.store import Store
@@ -21,15 +21,6 @@ _DIR = os.environ.get("ASKPDF_REAL_PDF_DIR")
 NIST = Path(_DIR) / "nist-sp-800-63b-4.pdf" if _DIR else None
 pytestmark = pytest.mark.skipif(
     NIST is None or not NIST.is_file(), reason="set ASKPDF_REAL_PDF_DIR to run"
-)
-
-
-# F1 is waiting on an amendment to ADR-0002 (the de-hyphenation rule): the code follows
-# the accepted rule today. Strict xfail: these fail loudly once the fix lands.
-PENDING_ADR_0002 = pytest.mark.xfail(
-    raises=AssertionError,
-    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment",
-    strict=True,
 )
 
 
@@ -60,14 +51,13 @@ def test_nist_running_header_is_flagged_on_body_pages(nist: Path) -> None:
     assert flagged / len(body) > 0.9
 
 
-@PENDING_ADR_0002
 def test_nist_dehyphenation_does_not_invent_words(nist: Path) -> None:
     # F1. For every line-end hyphen the cleaner removes, the solid form should be a
     # word the document uses elsewhere, not a hyphenated compound glued together.
     raw = PypdfExtractor().extract(nist)
     text = "\n".join(p.text for p in raw)
     vocab = Counter(re.findall(r"[\w-]+", text.replace("-\n", " ")))
-    cleaned = "\n".join(clean_text(p.text) for p in raw)
+    cleaned = "\n".join(clean_document([p.text for p in raw]))
     invented = []
     for head, tail in re.findall(r"(\w+)-\n(\w+)", text):
         solid = head + tail

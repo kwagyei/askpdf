@@ -24,15 +24,6 @@ from tests.pdfs import PageSpec, make_pdf, text_page
 # --- PDF builders this file needs beyond tests/pdfs.py ---------------------------------
 
 
-# F1 is waiting on an amendment to ADR-0002 (the de-hyphenation rule): the code follows
-# the accepted rule today. Strict xfail: these fail loudly once the fix lands.
-PENDING_ADR_0002 = pytest.mark.xfail(
-    raises=AssertionError,
-    reason="F1: de-hyphenation rule awaits the ADR-0002 amendment",
-    strict=True,
-)
-
-
 def _font(writer: PdfWriter, to_unicode: bytes | None = None) -> object:
     font = DictionaryObject(
         {
@@ -93,7 +84,6 @@ def make_zero_page_pdf(path: Path) -> Path:
 # --- cleaning: must never change words ----------------------------------------------------
 
 
-@PENDING_ADR_0002
 @pytest.mark.parametrize(
     "compound",
     ["multi-factor", "out-of-band", "side-channel", "phishing-resistant", "non-exportable"],
@@ -109,10 +99,11 @@ def test_line_break_inside_a_hyphenated_compound_keeps_the_hyphen(compound: str)
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("Hello wor­\nld.", "Hello world."),  # soft hyphen at the line break
-        ("Hello wor-\n ld.", "Hello world."),  # indented continuation line
-        ("Hello wor- \nld.", "Hello world."),  # trailing space after the hyphen
-        ("Hello wor-\n\nld.", "Hello world."),  # blank line in between
+        # "world" appears solid elsewhere, so the lexicon rule removes the hyphen.
+        ("Hello wor­\nld, world.", "Hello world, world."),  # soft hyphen at the break
+        ("Hello wor-\n ld, world.", "Hello world, world."),  # indented continuation line
+        ("Hello wor- \nld, world.", "Hello world, world."),  # trailing space after the hyphen
+        ("Hello wor-\n\nld, world.", "Hello world, world."),  # blank line in between
     ],
 )
 def test_line_end_hyphenation_variants_are_treated_alike(raw: str, expected: str) -> None:

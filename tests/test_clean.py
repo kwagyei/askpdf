@@ -10,10 +10,11 @@ from askpdf.extract.clean import clean_text, detect_boilerplate
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("Hello wor-\nld.", "Hello world."),  # broken word rejoined
-        ("Covid-\n19 cases", "Covid-\n19 cases"),  # digit after the break: keep
-        ("Smith-\nJones", "Smith-\nJones"),  # capital after the break: keep
-        ("räk-\nsmörgås", "räksmörgås"),  # non-ASCII letters
+        ("Hello wor-\nld, world.", "Hello world, world."),  # solid form attested: rejoined
+        ("Hello wor-\nld.", "Hello wor-ld."),  # not attested: lines joined, hyphen kept
+        ("Covid-\n19 cases", "Covid-19 cases"),  # digit after the break: keep the hyphen
+        ("Smith-\nJones", "Smith-Jones"),  # capital after the break: keep the hyphen
+        ("räk-\nsmörgås och räksmörgås", "räksmörgås och räksmörgås"),  # non-ASCII letters
         ("multi­ple", "multiple"),  # soft hyphen
         ("ﬁnance", "finance"),  # ligature (NFKC)
         ("a\u00a0 b\t\tc", "a b c"),  # whitespace runs, incl. no-break space

@@ -35,7 +35,16 @@ def _visible_chars(text: str) -> int:
 
 
 class ExtractionError(Exception):
-    """The file cannot be read: encrypted with a password, corrupt, or not a PDF."""
+    """The file cannot be read: encrypted with a password, corrupt, or not a PDF.
+
+    ``retry`` marks failures caused by this machine rather than the file (a missing
+    crypto backend, running out of memory): the indexer tries such a file again next
+    run instead of waiting for it to change.
+    """
+
+    def __init__(self, message: str, *, retry: bool = False) -> None:
+        super().__init__(message)
+        self.retry = retry
 
 
 class Extractor(Protocol):
