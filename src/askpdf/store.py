@@ -162,6 +162,14 @@ class NotAnIndexError(Exception):
     """The file exists but was not created by askpdf; it is never overwritten."""
 
 
+class OutdatedIndexError(Exception):
+    """The index was made by another askpdf version or with other settings.
+
+    Raised only for readers: wiping it is the indexer's job, never a side effect of a
+    search.
+    """
+
+
 class WrongFolderError(Exception):
     """The index belongs to another folder; reusing it would wipe that folder's index."""
 
@@ -181,7 +189,12 @@ def _is_askpdf_index(db: sqlite3.Connection) -> bool:
 
 
 class Store:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, rebuild: bool = True) -> None:
+        """Open (or create) the index at ``path``.
+
+        With ``rebuild=False``, for commands that only read, an index from another schema
+        version raises OutdatedIndexError instead of being replaced by an empty one.
+        """
         if path.is_dir():
             raise NotAnIndexError(f"{path} is a directory, not an index file")
         self.path = path
@@ -200,6 +213,9 @@ class Store:
             # database: only a file askpdf creates itself is ever written.
             self._db.close()
             raise NotAnIndexError(f"{path} is not an askpdf index; refusing to overwrite it")
+        if version != SCHEMA_VERSION and not rebuild:
+            self._db.close()
+            raise OutdatedIndexError(f"{path} was made by another version of askpdf")
         if version != SCHEMA_VERSION:
             # An index from another schema version. It is a cache of the folder, so it is
             # replaced, never migrated.
@@ -242,6 +258,16 @@ class Store:
 
     def __exit__(self, *exc: object) -> None:
         self.close()
+
+    @contextmanager
+    def read_transaction(self) -> Iterator[None]:
+        """Reads inside see one committed state of the index (WAL snapshot isolation),
+        however many documents the indexer commits meanwhile."""
+        self._db.execute("BEGIN DEFERRED")
+        try:
+            yield
+        finally:
+            self._db.execute("COMMIT")  # a read-only transaction: nothing to undo
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -288,6 +314,10 @@ class Store:
         owner = self._get_meta("folder")
         if owner is not None and owner != key:
             raise WrongFolderError(f"{self.path} is the index of {owner}")
+
+    def pins_match(self, pins: Mapping[str, Any]) -> bool:
+        """True if the index was built with these settings; for readers, who never wipe."""
+        return bool(self._get_meta("pins") == json.loads(json.dumps(pins, sort_keys=True)))
 
     def ensure_pins(self, pins: Mapping[str, Any]) -> bool:
         """Record the settings this index is built with; wipe it if they changed.
@@ -446,3 +476,26 @@ class Store:
             (sha256,),
         ).fetchall()
         return [ChunkRecord(*row) for row in rows]
+
+    # --- query snapshot ----------------------------------------------------------
+
+    def all_chunks(self) -> list[tuple[int, str, int, int, str]]:
+        """``(id, sha256, page, ordinal, text)`` for every chunk, in id order."""
+        return self._db.execute(
+            "SELECT id, sha256, page, ordinal, text FROM chunks ORDER BY id"
+        ).fetchall()
+
+    def page_labels(self) -> dict[tuple[str, int], str]:
+        return {
+            (sha, page): label
+            for sha, page, label in self._db.execute("SELECT sha256, page, label FROM pages")
+        }
+
+    def indexed_paths(self) -> dict[str, tuple[str, ...]]:
+        """The files of each document, sorted; a document has several if it was copied."""
+        paths: dict[str, list[str]] = {}
+        for path, sha256 in self._db.execute(
+            "SELECT path, sha256 FROM files WHERE status = 'indexed' ORDER BY path"
+        ):
+            paths.setdefault(sha256, []).append(path)
+        return {sha: tuple(p) for sha, p in paths.items()}
