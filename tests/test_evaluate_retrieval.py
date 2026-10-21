@@ -7,6 +7,7 @@ import pytest
 from askpdf.cli import main
 from askpdf.evaluate.questions import Question
 from askpdf.evaluate.retrieval import evaluate
+from tests.eval_pins import require_pinned_extractor
 
 EVAL = Path(__file__).resolve().parent.parent / "eval"
 
@@ -64,6 +65,7 @@ def test_a_missing_question_set_is_reported(
 def test_bm25_on_dev_reproduces_the_committed_results(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    require_pinned_extractor()
     out = tmp_path / "retrieval.json"
     assert main(["eval", "retrieval", "--eval-dir", str(EVAL), "--json", str(out)]) == 0
     committed = EVAL / "results" / "dev-retrieval-bm25.json"

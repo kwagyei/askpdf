@@ -16,6 +16,7 @@ from askpdf.evaluate.extraction import (
     word_detection,
 )
 from askpdf.store import PageRecord
+from tests.eval_pins import require_pinned_extractor
 
 REPO_TRANSCRIPTS = Path(__file__).resolve().parent.parent / "eval" / "transcripts"
 
@@ -117,6 +118,7 @@ def test_eval_extraction_reproduces_the_committed_results(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # The CI gate runs the same comparison; this makes a local `pytest` catch it too.
+    require_pinned_extractor()
     pytest.importorskip("jiwer")
     from askpdf.cli import main
 

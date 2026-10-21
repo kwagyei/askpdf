@@ -1,6 +1,6 @@
 {
   "stage": "extraction",
-  "extractor": "pypdf 6.20.1",
+  "extractor": "pypdf 6.21.2",
   "pages": [
     {
       "doc": "naca-rm-l56l14a",

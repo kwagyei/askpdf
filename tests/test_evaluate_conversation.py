@@ -13,6 +13,7 @@ from askpdf.evaluate.conversation import Conversation, evaluate, load
 from askpdf.evaluate.questions import evidence_problems
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import build_records
+from tests.eval_pins import require_pinned_extractor
 
 EVAL = Path(__file__).resolve().parent.parent / "eval"
 CONVERSATIONS = EVAL / "conversations"
@@ -122,6 +123,7 @@ def test_the_test_conversations_are_frozen() -> None:
 def test_conversations_on_dev_reproduce_the_committed_results(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    require_pinned_extractor()
     out = tmp_path / "conversation.json"
     assert main(["eval", "conversation", "--eval-dir", str(EVAL), "--json", str(out)]) == 0
     committed = EVAL / "results" / "dev-conversation-bm25.json"
