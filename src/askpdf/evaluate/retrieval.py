@@ -14,6 +14,7 @@ from typing import Any
 from askpdf.chunking import ChunkParams
 from askpdf.evaluate.metrics import RETRIEVAL_METRICS, mean_scores, retrieval_scores
 from askpdf.evaluate.questions import Question
+from askpdf.evaluate.stats import bootstrap_ci
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import index_folder
 from askpdf.retrieve import search_bm25
@@ -59,10 +60,16 @@ def evaluate(questions: Sequence[Question], retrieve: Retriever) -> dict[str, An
             if q.id in per_question:
                 groups[getattr(q, field)][q.id] = per_question[q.id]
         by[field] = {name: _rounded(mean_scores(scores)) for name, scores in sorted(groups.items())}
+    intervals = {}
+    if per_question:
+        for metric in RETRIEVAL_METRICS:
+            ci = bootstrap_ci([scores[metric] for scores in per_question.values()])
+            intervals[metric] = [round(ci.low, 6), round(ci.high, 6)]
     return {
         "metrics": list(RETRIEVAL_METRICS),
         "n_questions": len(per_question),
         "overall": _rounded(mean_scores(per_question)),
+        "interval_95": intervals,  # percentile bootstrap, 10,000 resamples, seed 0
         "by_kind": by["kind"],
         "by_doc": by["doc"],
         "per_question": dict(sorted(per_question.items())),

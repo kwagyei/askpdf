@@ -36,15 +36,64 @@ so a bad answer can be traced to where it went wrong:
 
 | Stage | Question it answers | Status |
 | --- | --- | --- |
-| Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | planned |
-| Retrieval | Did we find the right page? (recall@k, MRR, nDCG) | planned |
+| Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
+| Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25 measured |
 | Grounding | Does the cited page actually contain the quote? | planned |
 | Abstention | Does it say "not found" instead of guessing? | planned |
-| Follow-ups | Are follow-up questions rewritten correctly? | planned |
+| Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
 | Latency | How long does it take on an 8 GB laptop without a GPU? | planned |
 
-Tuning happens on a development split; the test split is frozen and scored once per release.
-Questions written by people who had not seen the answer (Qasper) complement the in-house set.
+Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
+once per release. Questions written by people who had not seen the answer (Qasper)
+complement the in-house set. A required CI job reruns every model-free number below and
+fails if one changes without the results file changing with it.
+
+### First results (development split, model-free)
+
+Extraction with pypdf 6.21.2, on 8 hand-transcribed pages from a security
+standard, a two-column paper and a 1957 scanned report:
+
+| Measure | Result |
+| --- | --- |
+| Mean character error rate | 0.031 (best page 0.003, worst 0.123) |
+| Header/footer detection, precision / recall | 1.000 / 0.553 |
+| Scanned-page detection, precision / recall | 1.000 / 1.000 |
+
+The worst pages are the scan, whose OCR layer reads "65A004" as "65AOOi-", and the
+paper's title page, where a figure interrupts the reading order. Header recall is low
+because the scan's OCR mangles each page's header differently, so it never repeats.
+
+Keyword retrieval (BM25) over the whole corpus, 49 answerable dev questions:
+
+| Questions | n | hit@1 | hit@5 | MRR@10 | nDCG@10 |
+| --- | --- | --- | --- | --- | --- |
+| all | 49 | 0.592 | 0.878 | 0.712 | 0.769 |
+| lexical | 13 | 0.923 | 1.000 | 0.949 | 0.962 |
+| multi-page | 2 | 0.000 | 1.000 | 0.267 | 0.513 |
+| paraphrase | 26 | 0.423 | 0.769 | 0.578 | 0.648 |
+| scanned | 5 | 0.800 | 1.000 | 0.900 | 0.936 |
+| table | 3 | 0.667 | 1.000 | 0.833 | 0.877 |
+
+With so few questions per row, only the overall row and the lexical/paraphrase contrast
+mean much: the 95% bootstrap interval for overall hit@1 is 0.45 to 0.73, and for nDCG@10
+0.68 to 0.85. BM25 finds questions that reuse the document's words (lexical) far more
+often than paraphrased ones. That gap is what the dense and hybrid retrievers have to
+close, and each is adopted only if a paired test on dev says it helps.
+
+Follow-up questions (14 on dev, such as "What about at AAL3?"), searched three ways:
+
+| Follow-up searched | hit@1 | nDCG@10 |
+| --- | --- | --- |
+| as typed | 0.429 | 0.620 |
+| history joined | 0.500 | 0.754 |
+| hand-written rewrite | 0.857 | 0.933 |
+
+**Who wrote the evaluation data.** The questions, conversations and page transcriptions
+were drafted by an AI model (Claude) working as the project's lead developer, and are
+being checked by hand by the author. The questions were written from askpdf's extracted
+text, so they lean towards passages the extractor reads well; self-written questions also
+favour lexical retrieval. Both are reasons the blind-written Qasper questions are reported
+next to them. The corpus files and their licences are listed in `eval/corpus/SOURCES.md`.
 
 ## Known limitations (so far)
 
