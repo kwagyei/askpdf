@@ -1,0 +1,15 @@
+[header] 2
+[header] NACA RM L56L14a
+Because of the decided reversal in trend between sweepback angles of 30° and 0°, the question has arisen as to what would be the variation of flutter-speed ratio with Mach number for a similar wing with only a small amount of sweepback. In order to supply this information, the present limited investigation was undertaken in the Langley transonic blowdown tunnel to determine the transonic flutter characteristics of a 10° sweptback wing with an aspect ratio of 4, a taper ratio of 0.6, and streamwise NACA 65A004 airfoil sections. Experimental flutter data were obtained for this wing at several Mach numbers from 0.79 to 1.34. Reference flutter speeds were calculated in the same manner as in reference 1 and were used to obtain flutter-speed ratios for comparison with the data of reference 1.
+SYMBOLS
+A	aspect ratio of wing including body intercept, Span2/Area
+a	distance in wing semichords from midchord to elastic axis position; perpendicular to quarter-chord line, positive with elastic axis behind midchord, 2xo - 1
+Ag	geometric aspect ratio, (Exposed semispan)2/Exposed semispan area
+b	half-chord perpendicular to quarter-chord line, ft
+br	half-chord perpendicular to quarter-chord line at intersection of quarter-chord line and wing root, ft
+bs	half-chord measured streamwise at intersection of wing and fuselage, ft
+EI	bending stiffness, lb-in.2
+GJ	torsion stiffness, lb-in.2
+fh,i	measured coupled bending frequencies, (i = 1, 2, or 3), cps
+ft	measured first coupled torsion frequency, cps
+fα	uncoupled first torsion frequency, fα = ft[1 - (xα/rα)2/(1 - (fh,1/ft))]1/2, (values taken at η = 0.75), cps

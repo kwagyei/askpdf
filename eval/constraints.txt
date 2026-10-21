@@ -1,0 +1,4 @@
+# The extractor the evaluation gate runs with. The gate compares results exactly, so a
+# new pypdf must arrive as a deliberate change: bump this, rerun the evals, commit the
+# new results in the same PR.
+pypdf==6.21.2

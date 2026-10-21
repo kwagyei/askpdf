@@ -1,0 +1,5 @@
+# LF everywhere: pinned files (test question sets, checksums, results) are hashed or
+# diffed byte for byte, and a Windows checkout must not turn them into CRLF.
+* text=auto eol=lf
+*.pdf binary
+*.png binary

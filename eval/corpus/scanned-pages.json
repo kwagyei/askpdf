@@ -1,0 +1,4 @@
+{
+  "_comment": "Pages known to have no text layer: the ground truth for scanned-page detection (ADR-0011).",
+  "nist-image-only": [1, 2]
+}
