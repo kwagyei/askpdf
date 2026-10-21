@@ -139,7 +139,14 @@ def test_document_cleaning_is_idempotent(pages: list[str]) -> None:
     assert clean_document(once) == once
 
 
-@given(_PAGES)
+# Header/footer detection needs MIN_PAGES pages, and a protected header or footer line
+# keeps its line-end hyphen (Amendment 1a); below that every break is resolved.
+_UNPROTECTED_PAGES = st.lists(
+    st.lists(_LINE_ALPHABET, max_size=40).map("".join), max_size=clean.MIN_PAGES - 1
+)
+
+
+@given(_UNPROTECTED_PAGES)
 def test_no_letter_or_digit_is_left_hyphenated_at_a_line_end(pages: list[str]) -> None:
     for page in clean_document(pages):
         assert not _BREAK.search(page), page
@@ -212,6 +219,13 @@ _DOCS = st.lists(
 def test_documents_with_headers_and_footers_clean_idempotently(pages: list[str]) -> None:
     once = clean_document(pages)
     assert clean_document(once) == once
+
+
+def test_a_protected_line_keeps_its_line_end_hyphen() -> None:
+    # "aaa" is an edge line on half of the 4 pages, so it is a header/footer and is never
+    # joined: the break before it stays, as Amendment 1a accepts. (Found by the reviewer.)
+    pages = ["", "", "aaa", "a-\naaa"]
+    assert clean_document(pages) == pages
 
 
 def test_a_footer_after_a_hyphenated_line_stays_on_its_own_line() -> None:

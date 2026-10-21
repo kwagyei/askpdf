@@ -59,6 +59,9 @@ Questions written by people who had not seen the answer (Qasper) complement the 
   document spells it solid more often than hyphenated; otherwise the hyphen stays. So
   "multi-factor" stays a compound, but a word broken by layout that the document uses only
   once keeps a stray hyphen ("algo-rithm"). How often that happens is measured before v0.1.
+  Header and footer lines are never joined to the text, but they are only recognised in
+  documents of 4 pages or more; in a shorter one, a page number under a hyphenated last
+  line can end up glued on ("multi-3").
 - Keyword search splits words at spaces and punctuation, with no stemming and an English
   stopword list. Languages written without spaces between words (Thai, Chinese, Japanese)
   are matched only as whole runs of text, and "authenticate" does not find "authenticator".
@@ -67,7 +70,10 @@ Questions written by people who had not seen the answer (Qasper) complement the 
 
 ## Development
 
-Requires Python 3.12 or newer.
+Requires Python 3.12 or newer. The runtime dependencies are deliberately few: pypdf, NumPy,
+FastAPI, Uvicorn and pycryptodome. pycryptodome gives pypdf an AES backend, so encrypted PDFs
+that open without a password can be read; it was chosen over `cryptography`, which no longer
+publishes wheels for Intel Macs.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install --upgrade pip
