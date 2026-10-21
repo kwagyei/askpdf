@@ -3,10 +3,12 @@
 Results go to stdout and progress to stderr, so output can be piped. Exit codes:
 0 success, 1 a run-time problem (missing folder, unusable or busy index), 2 bad
 options, 130 interrupted.
-The remaining subcommands (serve, ask, eval, bench) arrive in later pull requests.
+The remaining subcommands (serve, ask, bench) and the other eval stages arrive in later
+pull requests.
 """
 
 import argparse
+import json
 import os
 import sqlite3
 import sys
@@ -18,7 +20,7 @@ from typing import TextIO
 from askpdf import __version__
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
-from askpdf.indexer import index_folder, pins
+from askpdf.indexer import build_records, index_folder, pins
 from askpdf.retrieve import DEFAULT_K, PageHit, search_bm25
 from askpdf.snapshot import Snapshot
 from askpdf.store import (
@@ -62,6 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="bm25",
         help="ranking method (dense and hybrid come with the model providers)",
     )
+    evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
+    evaluate.add_argument("stage", choices=["extraction"])
+    evaluate.add_argument(
+        "--eval-dir",
+        type=Path,
+        default=Path("eval"),
+        metavar="DIR",
+        help="the evaluation data (default: ./eval, as in the repository)",
+    )
+    evaluate.add_argument("--json", type=Path, metavar="PATH", help="also write the results here")
     return parser
 
 
@@ -195,6 +207,40 @@ def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     return 0
 
 
+def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    from askpdf.evaluate import extraction  # only `eval` needs it
+
+    corpus, transcripts = args.eval_dir / "corpus", args.eval_dir / "transcripts"
+    if not corpus.is_dir() or not transcripts.is_dir():
+        return _error(err, f"no evaluation data in {args.eval_dir} (run from the repository)")
+    try:
+        import jiwer  # noqa: F401 - only checking it is installed
+    except ImportError:
+        return _error(err, "the eval stages need the eval group: pip install --group eval")
+    pages = {}
+    for pdf in sorted(corpus.glob("*.pdf")):
+        records, _ = build_records(PypdfExtractor().extract(pdf), ChunkParams())
+        pages[pdf.stem] = records
+    scanned_gold = json.loads((corpus / "scanned-pages.json").read_text(encoding="utf-8"))
+    gold = {(doc, n) for doc, numbers in scanned_gold.items() if doc in pages for n in numbers}
+    results = extraction.evaluate_pages(extraction.load_transcripts(transcripts), pages)
+    summary = extraction.summarise(results, extraction.scanned_detection(pages, gold))
+    summary = {"stage": "extraction", "extractor": f"pypdf {PypdfExtractor.version}", **summary}
+    for row in summary["pages"]:
+        print(f"{row['doc']}  page {row['page']}  CER {row['cer']:.3f}", file=out)
+    print(f"mean CER {summary['mean_cer']:.3f} over {len(results)} pages", file=out)
+    for name in ("boilerplate", "scanned"):
+        pr = summary[name]
+        print(f"{name}: precision {_fmt(pr['precision'])}, recall {_fmt(pr['recall'])}", file=out)
+    if args.json:
+        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    return 0
+
+
+def _fmt(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
 SNIPPET_CHARS = 160
 
 
@@ -245,7 +291,7 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    commands = {"index": cmd_index, "docs": cmd_docs, "search": cmd_search}
+    commands = {"index": cmd_index, "docs": cmd_docs, "search": cmd_search, "eval": cmd_eval}
     if args.command not in commands:
         build_parser().print_help(sys.stderr)
         return 2
