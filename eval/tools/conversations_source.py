@@ -43,9 +43,9 @@ C = {
         T("Should it be changed every year?", "Should passwords be changed periodically?", NIST, [25], ["SHALL NOT require subscribers to change passwords periodically"]),
     ],
     "conv-02": [
-        T("What is the overall reauthentication timeout at AAL2?", None, NIST, [18], ["SHOULD be no more than 24 hours at AAL2"]),
-        T("What about at AAL3?", "What is the overall reauthentication timeout at AAL3?", NIST, [20], ["the overall timeout for reauthentication SHALL be no more than 12 hours"]),
-        T("And the idle limit there?", "What is the inactivity timeout at AAL3?", NIST, [20], ["The inactivity timeout SHOULD be no more than 15 minutes."]),
+        T("What is the overall reauthentication timeout at AAL2?", None, NIST, [18, 22], ["SHOULD be no more than 24 hours at AAL2", "Reauthentication (recommended) 30 days overall 24 hours overall"]),
+        T("What about at AAL3?", "What is the overall reauthentication timeout at AAL3?", NIST, [20, 22], ["the overall timeout for reauthentication SHALL be no more than 12 hours", "12 hours overall 15 minutes inactivity"]),
+        T("And the idle limit there?", "What is the inactivity timeout at AAL3?", NIST, [20, 22], ["The inactivity timeout SHOULD be no more than 15 minutes.", "12 hours overall 15 minutes inactivity"]),
     ],
     "conv-03": [
         T("What false match rate must a biometric system meet?", None, NIST, [43], ["of one in 10000 or better for all demographic groups"]),
@@ -89,7 +89,7 @@ C = {
     ],
     "conv-11": [
         T("What were the flutter models made of?", None, NACA, [5], ["a phenolic laminate material with high-strength paper reinforcement"]),
-        T("Who wrote the report?", "Who wrote the NACA report on the flutter of the 10-degree sweptback wing?", NACA, [2], ["By George W. Jones, Jr."]),
+        T("Who wrote the report?", "Who wrote the NACA report on the flutter of the 10-degree sweptback wing?", NACA, [1, 2], ["By George W. Jones, Jr.", "ByGeorgeW. fones, Jr."]),
         T("Different topic: in Qasper, how long are extractive answers?", "How long are extractive answers in Qasper on average?", QASPER, [3], ["The average length of the extractive answers is 14.4 words"], switch=True),
     ],
     "conv-12": [

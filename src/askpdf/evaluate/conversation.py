@@ -11,14 +11,13 @@ The model rewrite (PR 8) is scored as a fourth condition, and reported as the sh
 the raw-to-gold gap it closes.
 """
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from askpdf.evaluate.metrics import mean_scores, retrieval_scores
-from askpdf.evaluate.questions import Question
+from askpdf.evaluate.questions import Question, read_jsonl
 from askpdf.evaluate.retrieval import Retriever
 
 CONDITIONS = ("raw", "concat", "gold")
@@ -80,8 +79,13 @@ class Conversation:
 
 
 def load(path: Path) -> list[Conversation]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    return [Conversation.from_json(json.loads(line)) for line in lines if line.strip()]
+    conversations = []
+    for row in read_jsonl(path):
+        try:
+            conversations.append(Conversation.from_json(row))
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"{row.get('id', '?')}: missing or malformed field {exc}") from exc
+    return conversations
 
 
 def evaluate(conversations: Sequence[Conversation], retrieve: Retriever) -> dict[str, Any]:

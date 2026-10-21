@@ -17,7 +17,7 @@ import sys
 import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from askpdf import __version__
 from askpdf.chunking import ChunkParams
@@ -218,25 +218,60 @@ def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     return 0
 
 
+RELEASE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+", re.ASCII)
+
+
 def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     corpus = args.eval_dir / "corpus"
     if not corpus.is_dir():
         return _error(err, f"no evaluation data in {args.eval_dir} (run from the repository)")
-    if args.split == "test" and not re.fullmatch(r"v\d+\.\d+\.\d+", args.release or ""):
-        return _error(err, "the test split is scored once per release: pass --release vX.Y.Z")
-    if args.stage == "retrieval":
-        return _eval_retrieval(args, out, err)
-    if args.stage == "conversation":
-        return _eval_conversation(args, out, err)
-    return _eval_extraction(args, out, err)
+    if args.stage == "extraction" and (args.split != "dev" or args.release):
+        return _error(err, "extraction has no question split; drop --split and --release")
+    if args.split == "dev" and args.release:
+        return _error(err, "--release goes with --split test only")
+    release_file, release = None, None
+    if args.split == "test":
+        if not RELEASE.fullmatch(args.release or ""):
+            return _error(err, "the test split is scored once per release: pass --release vX.Y.Z")
+        # The frozen split is scored once per release, into its own file (ADR-0007).
+        release_file = args.eval_dir / "results" / f"test-{args.release}.json"
+        release = {"release": args.release, "stages": {}}
+        if release_file.exists():
+            release = json.loads(release_file.read_text(encoding="utf-8"))
+        if args.stage in release["stages"]:
+            return _error(
+                err,
+                f"{args.stage} on the test split was already scored for {args.release}"
+                f" ({release_file}); the test split is scored once per release",
+            )
+    run = {"retrieval": _eval_retrieval, "conversation": _eval_conversation}
+    try:
+        summary = run.get(args.stage, _eval_extraction)(args, out)
+    except ValueError as exc:
+        return _error(err, exc)
+    try:
+        if args.json:
+            _write_json(args.json, summary)
+        if release_file is not None and release is not None:
+            release["stages"][args.stage] = summary
+            release_file.parent.mkdir(parents=True, exist_ok=True)
+            _write_json(release_file, release)
+            print(f"wrote {release_file}", file=err)
+    except OSError as exc:
+        return _error(err, f"cannot write the results: {exc.strerror or exc}")
+    return 0
 
 
-def _eval_retrieval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+def _write_json(path: Path, data: object) -> None:
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _eval_retrieval(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     from askpdf.evaluate import questions, retrieval  # only `eval` needs them
 
     path = args.eval_dir / "questions" / f"{args.split}.jsonl"
     if not path.is_file():
-        return _error(err, f"no question set at {path}")
+        raise ValueError(f"no question set at {path}")
     snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
     result = retrieval.evaluate(questions.load(path), retrieval.bm25_retriever(snapshot))
     summary = {"stage": "retrieval", "split": args.split, "retriever": "bm25", **result}
@@ -249,17 +284,15 @@ def _eval_retrieval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             print(
                 f"  {name}: hit@1 {scores['hit@1']:.3f}  ndcg@10 {scores['ndcg@10']:.3f}", file=out
             )
-    if args.json:
-        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
-    return 0
+    return summary
 
 
-def _eval_conversation(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+def _eval_conversation(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     from askpdf.evaluate import conversation, retrieval  # only `eval` needs them
 
     path = args.eval_dir / "conversations" / f"{args.split}.jsonl"
     if not path.is_file():
-        return _error(err, f"no conversations at {path}")
+        raise ValueError(f"no conversations at {path}")
     snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
     result = conversation.evaluate(conversation.load(path), retrieval.bm25_retriever(snapshot))
     summary = {"stage": "conversation", "split": args.split, "retriever": "bm25", **result}
@@ -270,21 +303,19 @@ def _eval_conversation(args: argparse.Namespace, out: TextIO, err: TextIO) -> in
     for condition, scores in result["overall"].items():
         hit, ndcg = scores["hit@1"], scores["ndcg@10"]
         print(f"  {condition}: hit@1 {hit:.3f}  ndcg@10 {ndcg:.3f}", file=out)
-    if args.json:
-        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
-    return 0
+    return summary
 
 
-def _eval_extraction(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+def _eval_extraction(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     from askpdf.evaluate import extraction  # only `eval` needs it
 
     corpus, transcripts = args.eval_dir / "corpus", args.eval_dir / "transcripts"
     if not transcripts.is_dir():
-        return _error(err, f"no transcriptions in {args.eval_dir}")
+        raise ValueError(f"no transcriptions in {args.eval_dir}")
     try:
         import jiwer  # noqa: F401 - only checking it is installed
     except ImportError:
-        return _error(err, "the eval stages need the eval group: pip install --group eval")
+        raise ValueError("the eval stages need the eval group: pip install --group eval") from None
     pages = {}
     for pdf in sorted(corpus.glob("*.pdf")):
         records, _ = build_records(PypdfExtractor().extract(pdf), ChunkParams())
@@ -300,9 +331,7 @@ def _eval_extraction(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     for name in ("boilerplate", "scanned"):
         pr = summary[name]
         print(f"{name}: precision {_fmt(pr['precision'])}, recall {_fmt(pr['recall'])}", file=out)
-    if args.json:
-        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
-    return 0
+    return summary
 
 
 def _fmt(value: float | None) -> str:

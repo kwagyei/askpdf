@@ -67,12 +67,12 @@ Keyword retrieval (BM25) over the whole corpus, 49 answerable dev questions:
 
 | Questions | n | hit@1 | hit@5 | MRR@10 | nDCG@10 |
 | --- | --- | --- | --- | --- | --- |
-| all | 49 | 0.592 | 0.878 | 0.712 | 0.769 |
-| lexical | 13 | 0.923 | 1.000 | 0.949 | 0.962 |
-| multi-page | 2 | 0.000 | 1.000 | 0.267 | 0.513 |
+| all | 49 | 0.592 | 0.878 | 0.712 | 0.768 |
+| lexical | 13 | 0.923 | 1.000 | 0.949 | 0.955 |
+| multi-page | 1 | 0.000 | 1.000 | 0.200 | 0.456 |
 | paraphrase | 26 | 0.423 | 0.769 | 0.578 | 0.648 |
 | scanned | 5 | 0.800 | 1.000 | 0.900 | 0.936 |
-| table | 3 | 0.667 | 1.000 | 0.833 | 0.877 |
+| table | 4 | 0.500 | 1.000 | 0.708 | 0.800 |
 
 With so few questions per row, only the overall row and the lexical/paraphrase contrast
 mean much: the 95% bootstrap interval for overall hit@1 is 0.45 to 0.73, and for nDCG@10

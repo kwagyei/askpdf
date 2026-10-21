@@ -44,6 +44,8 @@ def _row(**overrides: object) -> dict[str, object]:
         ({"evidence": ["1.6"]}, "shorter than 15"),
         ({"kind": "multi-page"}, "at least two pages"),
         ({"answerable": False}, "answerable questions need"),
+        ({"pages": [1, 1]}, "listed twice"),
+        ({"evidence": ["1.6" + " " * 20]}, "shorter than 15"),
     ],
 )
 def test_malformed_questions_are_refused(overrides: dict[str, object], message: str) -> None:
@@ -62,8 +64,6 @@ def test_evidence_must_be_on_the_cited_pages() -> None:
     assert evidence_problems(q, pages) == []  # line breaks do not matter
     moved = Question.from_json(_row(pages=[1], evidence=["something else entirely"]))
     assert "quote not on its pages" in evidence_problems(moved, pages)[0]
-    two = Question.from_json(_row(pages=[1, 1], kind="multi-page"))
-    assert evidence_problems(two, {"d": pages["d"]}) == []
     out_of_range = Question.from_json(_row(pages=[3]))
     assert "out of range" in evidence_problems(out_of_range, pages)[0]
     assert "no document" in evidence_problems(q, {})[0]
