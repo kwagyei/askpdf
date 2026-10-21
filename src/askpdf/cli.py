@@ -10,6 +10,7 @@ pull requests.
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 import unicodedata
@@ -65,7 +66,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="ranking method (dense and hybrid come with the model providers)",
     )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
-    evaluate.add_argument("stage", choices=["extraction"])
+    evaluate.add_argument("stage", choices=["extraction", "retrieval"])
+    evaluate.add_argument(
+        "--split",
+        choices=["dev", "test"],
+        default="dev",
+        help="question set for retrieval (test is scored once per release)",
+    )
+    evaluate.add_argument(
+        "--release", metavar="vX.Y.Z", help="required with --split test (ADR-0007)"
+    )
     evaluate.add_argument(
         "--eval-dir",
         type=Path,
@@ -208,11 +218,45 @@ def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
 
 def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    corpus = args.eval_dir / "corpus"
+    if not corpus.is_dir():
+        return _error(err, f"no evaluation data in {args.eval_dir} (run from the repository)")
+    if args.split == "test" and not re.fullmatch(r"v\d+\.\d+\.\d+", args.release or ""):
+        return _error(err, "the test split is scored once per release: pass --release vX.Y.Z")
+    if args.stage == "retrieval":
+        return _eval_retrieval(args, out, err)
+    return _eval_extraction(args, out, err)
+
+
+def _eval_retrieval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    from askpdf.evaluate import questions, retrieval  # only `eval` needs them
+
+    path = args.eval_dir / "questions" / f"{args.split}.jsonl"
+    if not path.is_file():
+        return _error(err, f"no question set at {path}")
+    snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
+    result = retrieval.evaluate(questions.load(path), retrieval.bm25_retriever(snapshot))
+    summary = {"stage": "retrieval", "split": args.split, "retriever": "bm25", **result}
+    if args.release:
+        summary["release"] = args.release
+    print(f"BM25 on {args.split}, {result['n_questions']} answerable questions", file=out)
+    print("  " + "  ".join(f"{m} {v:.3f}" for m, v in result["overall"].items()), file=out)
+    for field in ("by_kind", "by_doc"):
+        for name, scores in result[field].items():
+            print(
+                f"  {name}: hit@1 {scores['hit@1']:.3f}  ndcg@10 {scores['ndcg@10']:.3f}", file=out
+            )
+    if args.json:
+        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    return 0
+
+
+def _eval_extraction(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     from askpdf.evaluate import extraction  # only `eval` needs it
 
     corpus, transcripts = args.eval_dir / "corpus", args.eval_dir / "transcripts"
-    if not corpus.is_dir() or not transcripts.is_dir():
-        return _error(err, f"no evaluation data in {args.eval_dir} (run from the repository)")
+    if not transcripts.is_dir():
+        return _error(err, f"no transcriptions in {args.eval_dir}")
     try:
         import jiwer  # noqa: F401 - only checking it is installed
     except ImportError:
