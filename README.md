@@ -53,12 +53,18 @@ Questions written by people who had not seen the answer (Qasper) complement the 
   document spells it solid more often than hyphenated; otherwise the hyphen stays. So
   "multi-factor" stays a compound, but a word broken by layout that the document uses only
   once keeps a stray hyphen ("algo-rithm"). How often that happens is measured before v0.1.
+  Header and footer lines are never joined to the text, but they are only recognised in
+  documents of 4 pages or more; in a shorter one, a page number under a hyphenated last
+  line can end up glued on ("multi-3").
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
   as Persian or Devanagari. The test corpus is English and Swedish.
 
 ## Development
 
-Requires Python 3.12 or newer.
+Requires Python 3.12 or newer. The runtime dependencies are deliberately few: pypdf, NumPy,
+FastAPI, Uvicorn and pycryptodome. pycryptodome gives pypdf an AES backend, so encrypted PDFs
+that open without a password can be read; it was chosen over `cryptography`, which no longer
+publishes wheels for Intel Macs.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install --upgrade pip
