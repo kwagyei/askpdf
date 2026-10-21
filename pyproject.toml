@@ -60,8 +60,8 @@ eval = [
     "pypdfium2>=5.0",   # extractor comparison and page rendering
     "rapidfuzz>=3.14",  # Qasper paragraph-to-page mapping
     # pdfminer.six (via pdfplumber) needs cryptography, which stopped publishing Intel-Mac
-    # wheels in 49.0.0 (ADR-0001 Amendment 1). Not yet verified: check on the Intel Mac in
-    # PR 4 with `pip install --group eval --only-binary :all:`.
+    # wheels in 49.0.0 (ADR-0001 Amendment 1). Checked 2026-10-21 on the Intel Mac, Python 3.13:
+    # `pip install --group eval --only-binary :all:` resolves cryptography 48.0.1.
     "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
