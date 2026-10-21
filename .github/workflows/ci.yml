@@ -84,6 +84,10 @@ jobs:
         run: |
           askpdf eval retrieval --split dev --json "$RUNNER_TEMP/retrieval.json"
           diff -u eval/results/dev-retrieval-bm25.json "$RUNNER_TEMP/retrieval.json"
+      - name: Conversations on dev match eval/results/dev-conversation-bm25.json
+        run: |
+          askpdf eval conversation --split dev --json "$RUNNER_TEMP/conversation.json"
+          diff -u eval/results/dev-conversation-bm25.json "$RUNNER_TEMP/conversation.json"
       - name: Hand-rolled metrics agree with pytrec_eval
         run: |
           python -m pip install --group dev

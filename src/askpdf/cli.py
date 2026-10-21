@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="ranking method (dense and hybrid come with the model providers)",
     )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
-    evaluate.add_argument("stage", choices=["extraction", "retrieval"])
+    evaluate.add_argument("stage", choices=["extraction", "retrieval", "conversation"])
     evaluate.add_argument(
         "--split",
         choices=["dev", "test"],
@@ -225,6 +225,8 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, "the test split is scored once per release: pass --release vX.Y.Z")
     if args.stage == "retrieval":
         return _eval_retrieval(args, out, err)
+    if args.stage == "conversation":
+        return _eval_conversation(args, out, err)
     return _eval_extraction(args, out, err)
 
 
@@ -246,6 +248,27 @@ def _eval_retrieval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             print(
                 f"  {name}: hit@1 {scores['hit@1']:.3f}  ndcg@10 {scores['ndcg@10']:.3f}", file=out
             )
+    if args.json:
+        args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    return 0
+
+
+def _eval_conversation(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    from askpdf.evaluate import conversation, retrieval  # only `eval` needs them
+
+    path = args.eval_dir / "conversations" / f"{args.split}.jsonl"
+    if not path.is_file():
+        return _error(err, f"no conversations at {path}")
+    snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
+    result = conversation.evaluate(conversation.load(path), retrieval.bm25_retriever(snapshot))
+    summary = {"stage": "conversation", "split": args.split, "retriever": "bm25", **result}
+    if args.release:
+        summary["release"] = args.release
+    n, switches = result["n_follow_ups"], result["n_topic_switches"]
+    print(f"BM25 on {args.split}, {n} follow-ups ({switches} topic switches)", file=out)
+    for condition, scores in result["overall"].items():
+        hit, ndcg = scores["hit@1"], scores["ndcg@10"]
+        print(f"  {condition}: hit@1 {hit:.3f}  ndcg@10 {ndcg:.3f}", file=out)
     if args.json:
         args.json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", "utf-8")
     return 0

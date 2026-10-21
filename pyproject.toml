@@ -83,6 +83,7 @@ known-first-party = ["askpdf"]
 "tests/**" = ["S101", "S106"]  # assert; test PDFs use fixed passwords
 # The question set is data: long lines, and quotes copied verbatim, curly quotes included.
 "eval/tools/questions_source.py" = ["E501", "RUF001"]
+"eval/tools/conversations_source.py" = ["E501", "RUF001"]
 
 [tool.mypy]
 strict = true
