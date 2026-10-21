@@ -1,5 +1,6 @@
 """Snapshots, page ranking and the `search` command."""
 
+import errno
 import sqlite3
 import subprocess
 import sys
@@ -300,3 +301,32 @@ def test_a_closed_pipe_exits_quietly(folder: Path) -> None:
     proc.stderr.close()
     assert proc.wait(timeout=60) == 1
     assert stderr == ""
+
+
+@pytest.mark.parametrize(
+    ("error", "platform", "closed"),
+    [
+        (BrokenPipeError(), "linux", True),
+        (OSError(errno.EINVAL, "Invalid argument"), "win32", True),
+        (OSError(errno.EINVAL, "Invalid argument"), "linux", False),  # a real error there
+        (OSError(errno.ENOSPC, "No space left"), "win32", False),
+    ],
+)
+def test_what_counts_as_a_closed_pipe(
+    error: OSError, platform: str, closed: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from askpdf.cli import _closed_pipe
+
+    monkeypatch.setattr(sys, "platform", platform)
+    assert _closed_pipe(error) is closed
+
+
+def test_other_write_errors_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import askpdf.cli as cli
+
+    def full(*args: object) -> int:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setitem(cli.main.__globals__, "cmd_docs", full)
+    with pytest.raises(OSError, match="No space"):
+        cli.main(["docs", "."])

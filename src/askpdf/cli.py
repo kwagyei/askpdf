@@ -8,6 +8,7 @@ pull requests.
 """
 
 import argparse
+import errno
 import json
 import os
 import re
@@ -356,6 +357,13 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     return 0
 
 
+def _closed_pipe(exc: OSError) -> bool:
+    """Writing to a pipe whose reader has gone: EPIPE, or EINVAL on Windows."""
+    return isinstance(exc, BrokenPipeError) or (
+        sys.platform == "win32" and exc.errno == errno.EINVAL
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     commands = {"index": cmd_index, "docs": cmd_docs, "search": cmd_search, "eval": cmd_eval}
@@ -366,7 +374,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         code = commands[args.command](args, sys.stdout, sys.stderr)
         sys.stdout.flush()  # a closed pipe shows up here, not in Python's exit flush
         return code
-    except BrokenPipeError:
+    except OSError as exc:
+        if not _closed_pipe(exc):
+            raise
         # The reader went away (`askpdf search … | head`). Point stdout at devnull so
         # the interpreter's final flush does not print a second error.
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
