@@ -8,8 +8,8 @@ page. It runs locally with [Ollama](https://ollama.com); nothing leaves your mac
 you opt in to a remote model.
 
 > **Work in progress.** The design is settled and the code arrives through pull requests.
-> What works today: reading a folder of PDFs into the local index. Search, answers and the
-> web app come next.
+> What works today: reading a folder of PDFs into the local index and searching it by
+> keyword (BM25). Answers and the web app come next.
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -17,10 +17,16 @@ reading nist-sp-800-63b-4.pdf
 1 added, 0 already known (copies or renames), 0 removed, 0 unchanged, 0 failed
 $ askpdf docs ~/Documents/papers
 nist-sp-800-63b-4.pdf  129 pages, 279 chunks, 0 image-only
+$ askpdf search ~/Documents/papers "phishing-resistant authenticators" -k 2
+1. nist-sp-800-63b-4.pdf  p. 35 (PDF page 46)  score 8.33
+   NIST SP 800-63B-4 July 2025 Digital Identity Guidelines Authentication and Authenticator Management 3.2.5. Phishing Resistance Phishing attacks, previously ref…
+2. nist-sp-800-63b-4.pdf  p. 29 (PDF page 40)  score 7.16
+   meet the requirements of Sec. 3.2.3, including limits on the number of consecutive authentication failures. The password or biometric sample used for activatio…
 ```
 
-Re-running `index` only reads new or changed files; renamed and copied files are recognised
-by their content and not read again. The index lives in your cache folder, never in the
+`search` ranks pages by BM25 over their chunks, needs no model, and treats `multi-factor`
+and `multi factor` as the same words. Re-running `index` only reads new or changed files;
+renamed and copied files are recognised by their content and not read again. The index lives in your cache folder, never in the
 folder you point it at.
 
 ## What makes it different
@@ -56,6 +62,9 @@ Questions written by people who had not seen the answer (Qasper) complement the 
   Header and footer lines are never joined to the text, but they are only recognised in
   documents of 4 pages or more; in a shorter one, a page number under a hyphenated last
   line can end up glued on ("multi-3").
+- Keyword search splits words at spaces and punctuation, with no stemming and an English
+  stopword list. Languages written without spaces between words (Thai, Chinese, Japanese)
+  are matched only as whole runs of text, and "authenticate" does not find "authenticator".
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
   as Persian or Devanagari. The test corpus is English and Swedish.
 
