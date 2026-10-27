@@ -22,15 +22,21 @@ from askpdf.chunking import ChunkParams, chunk_page
 from askpdf.extract import clean
 from askpdf.extract.base import ExtractionError, Extractor, RawPage
 from askpdf.extract.clean import clean_document, clean_text, detect_boilerplate
+from askpdf.providers.base import Embedder
 from askpdf.store import ChunkRecord, FileRow, PageRecord, Store, folder_key
 
 PIN_SCHEMA = 1
+EMBEDDER = "ollama/nomic-embed-text"
+EMBED_BATCH = 64  # chunks per committed batch: an interrupted run keeps its progress
 
 
-def pins(extractor: Extractor, params: ChunkParams) -> dict[str, Any]:
+def pins(extractor: Extractor, params: ChunkParams, embedder: str = EMBEDDER) -> dict[str, Any]:
     """Everything that changes what the index holds. A change forces a rebuild."""
     return {
         "pipeline": PIN_SCHEMA,
+        # The embedder is pinned even while Ollama is down: vectors from two models
+        # cannot be compared, so switching models must rebuild the index.
+        "embedder": embedder,
         "extractor": {"name": extractor.name, "version": extractor.version},
         "cleaning": clean.CLEANING_VERSION,
         "chunking": {"target": params.target, "overlap": params.overlap, "snap": params.snap},
@@ -213,3 +219,27 @@ def index_folder(
     store.remove_files(gone)
     report.removed = gone
     return report
+
+
+def embed_missing(
+    store: Store, embedder: Embedder, on_batch: Callable[[int, int], None] | None = None
+) -> int:
+    """Embed every chunk that has no vector yet; return how many were embedded.
+
+    Runs after indexing, and on every later run, so an index built while Ollama was not
+    running catches up instead of being rebuilt. ``on_batch(done, total)`` reports
+    progress. A provider error propagates; batches already stored are kept.
+    """
+    todo = store.chunks_without_vectors()
+    for start in range(0, len(todo), EMBED_BATCH):
+        batch = todo[start : start + EMBED_BATCH]
+        vectors = embedder.embed_documents([text for _, text in batch])
+        store.put_vectors(
+            [
+                (cid, vector.astype("<f4").tobytes())
+                for (cid, _), vector in zip(batch, vectors, strict=True)
+            ]
+        )
+        if on_batch is not None:
+            on_batch(start + len(batch), len(todo))
+    return len(todo)

@@ -124,6 +124,18 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_local_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point askpdf at a closed port, so no test depends on an Ollama running here.
+
+    Port 9 (discard) refuses at once. Provider tests start their own local server and
+    set ASKPDF_OLLAMA_URL to it.
+    """
+    monkeypatch.setenv("ASKPDF_OLLAMA_URL", "http://127.0.0.1:9")
+    monkeypatch.delenv("ASKPDF_ALLOW_REMOTE", raising=False)
+    monkeypatch.delenv("ASKPDF_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _allow_network_if_marked(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:

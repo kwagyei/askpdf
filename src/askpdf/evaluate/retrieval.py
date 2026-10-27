@@ -16,8 +16,9 @@ from askpdf.evaluate.metrics import RETRIEVAL_METRICS, mean_scores, retrieval_sc
 from askpdf.evaluate.questions import Question
 from askpdf.evaluate.stats import bootstrap_ci
 from askpdf.extract.pypdf_ext import PypdfExtractor
-from askpdf.indexer import index_folder
-from askpdf.retrieve import search_bm25
+from askpdf.indexer import embed_missing, index_folder
+from askpdf.providers.base import Embedder, Matrix
+from askpdf.retrieve import RRF_K, PageHit, search_bm25, search_dense, search_hybrid
 from askpdf.snapshot import Snapshot
 from askpdf.store import Store
 
@@ -26,20 +27,58 @@ DEPTH = 10  # every metric looks at the top 10 pages at most
 type Retriever = Callable[[str], list[tuple[str, int]]]
 
 
+def _ids(hits: Sequence[PageHit]) -> list[tuple[str, int]]:
+    return [(Path(h.paths[0]).stem if h.paths else h.sha256, h.page) for h in hits]
+
+
 def bm25_retriever(snapshot: Snapshot) -> Retriever:
     def retrieve(question: str) -> list[tuple[str, int]]:
-        return [
-            (Path(hit.paths[0]).stem if hit.paths else hit.sha256, hit.page)
-            for hit in search_bm25(snapshot, question, k=DEPTH)
-        ]
+        return _ids(search_bm25(snapshot, question, k=DEPTH))
+
+    return retrieve
+
+
+class QueryCache:
+    """Embed each question once, however many retrievers are compared on it."""
+
+    def __init__(self, embedder: Embedder) -> None:
+        self.embedder = embedder
+        self._vectors: dict[str, Matrix] = {}
+
+    def __call__(self, question: str) -> Matrix:
+        if question not in self._vectors:
+            self._vectors[question] = self.embedder.embed_query(question)
+        return self._vectors[question]
+
+
+def model_retriever(
+    snapshot: Snapshot, queries: QueryCache, kind: str, rrf_k: int = RRF_K
+) -> Retriever:
+    """Dense (cosine) or hybrid (RRF of BM25 and dense) retrieval."""
+    if not snapshot.fully_embedded:
+        raise ValueError("the evaluation index is not fully embedded")
+
+    def retrieve(question: str) -> list[tuple[str, int]]:
+        vector = queries(question)
+        if kind == "dense":
+            return _ids(search_dense(snapshot, vector, k=DEPTH))
+        return _ids(search_hybrid(snapshot, question, vector, k=DEPTH, rrf_k=rrf_k))
 
     return retrieve
 
 
 def load_corpus_snapshot(corpus: Path) -> Snapshot:
-    """Index the corpus into a throwaway index and return its snapshot."""
+    """Index the corpus into a throwaway index and return its snapshot (no vectors)."""
     with tempfile.TemporaryDirectory() as tmp, Store(Path(tmp) / "index.db") as store:
         index_folder(corpus, store, PypdfExtractor(), ChunkParams())
+        return Snapshot.load(store)
+
+
+def load_embedded_snapshot(corpus: Path, embedder: Embedder, index: Path) -> Snapshot:
+    """Index and embed the corpus into a lasting index, so later runs skip the slow part."""
+    with Store(index) as store:
+        index_folder(corpus, store, PypdfExtractor(), ChunkParams())
+        embed_missing(store, embedder)
         return Snapshot.load(store)
 
 

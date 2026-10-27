@@ -499,3 +499,28 @@ class Store:
         ):
             paths.setdefault(sha256, []).append(path)
         return {sha: tuple(p) for sha, p in paths.items()}
+
+    # --- vectors -------------------------------------------------------------------
+
+    def chunks_without_vectors(self) -> list[tuple[int, str]]:
+        """``(id, text)`` of every chunk not embedded yet, in id order."""
+        return self._db.execute(
+            "SELECT c.id, c.text FROM chunks c LEFT JOIN vectors v ON v.chunk_id = c.id"
+            " WHERE v.chunk_id IS NULL ORDER BY c.id"
+        ).fetchall()
+
+    def put_vectors(self, rows: Sequence[tuple[int, bytes]]) -> None:
+        """Store float32 vectors for chunks, in one transaction; readers rebuild after it."""
+        if not rows:
+            return
+        with self.transaction():
+            # A chunk deleted since it was read has no row to refer to; skip it.
+            self._db.executemany(
+                "INSERT OR REPLACE INTO vectors (chunk_id, vector)"
+                " SELECT ?, ? WHERE EXISTS (SELECT 1 FROM chunks WHERE id = ?)",
+                [(cid, blob, cid) for cid, blob in rows],
+            )
+            self._bump_generation()
+
+    def all_vectors(self) -> dict[int, bytes]:
+        return dict(self._db.execute("SELECT chunk_id, vector FROM vectors").fetchall())
