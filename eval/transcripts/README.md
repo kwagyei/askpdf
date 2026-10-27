@@ -2,8 +2,8 @@
 
 Ground truth for text extraction (ADR-0011): each file is one page, typed from the
 rendered page image (`eval/tools/render.py`), never from askpdf's output. A model drafted
-them and Kwabena Sasu-Boakye corrected them side by side with the images; the README
-says so too.
+them; Kwabena Sasu-Boakye is checking them side by side with the images in `eval/pages/`.
+The main README says so too.
 
 File names are `<document>-p<physical page, 3 digits>.txt`.
 

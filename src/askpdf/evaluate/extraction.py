@@ -86,6 +86,8 @@ def evaluate_pages(
     """Score each transcribed page against the extracted pages of its document."""
     results = []
     for t in transcripts:
+        if t.doc not in pages or not 1 <= t.page <= len(pages[t.doc]):
+            raise ValueError(f"transcript {t.doc}-p{t.page:03d}: no such page in the corpus")
         record = pages[t.doc][t.page - 1]
         gold = Counter(w for line in t.boilerplate for w in line.split())
         results.append(

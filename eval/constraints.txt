@@ -2,3 +2,6 @@
 # new pypdf must arrive as a deliberate change: bump this, rerun the evals, commit the
 # new results in the same PR.
 pypdf==6.21.2
+# Character error rate and the bootstrap intervals depend on these as well.
+jiwer==4.0.0
+numpy==2.5.4

@@ -237,7 +237,12 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         release_file = args.eval_dir / "results" / f"test-{args.release}.json"
         release = {"release": args.release, "stages": {}}
         if release_file.exists():
-            release = json.loads(release_file.read_text(encoding="utf-8"))
+            try:
+                release = json.loads(release_file.read_text(encoding="utf-8"))
+                if not isinstance(release, dict) or not isinstance(release.get("stages"), dict):
+                    raise ValueError("not an askpdf release results file")
+            except (OSError, ValueError) as exc:
+                return _error(err, f"cannot read {release_file}: {exc}")
         if args.stage in release["stages"]:
             return _error(
                 err,

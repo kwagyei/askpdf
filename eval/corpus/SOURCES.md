@@ -11,7 +11,9 @@ None of the files is encrypted.
 - **URL:** https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63B-4.pdf
 - **Licence:** the publication states (PDF page 3): "This publication may be used by
   nongovernmental organizations on a voluntary basis and is not subject to copyright in
-  the United States." Its copyright status outside the United States may differ.
+  the United States. Attribution would, however, be appreciated by NIST." Its copyright
+  status outside the United States may differ. Attribution: National Institute of
+  Standards and Technology, NIST SP 800-63B-4.
 - **Why it is here:** long (129 pages), roman-numbered front matter, a four-line running
   header, normative lists, and line breaks inside hyphenated compounds.
 
@@ -43,6 +45,23 @@ None of the files is encrypted.
 - **Licence:** as the source (a US Government work).
 - **Why it is here:** pages certain to have no text layer, the ground truth for
   scanned-page detection.
+
+## Files derived from the corpus elsewhere in `eval/`
+- `eval/pages/*.png` are renderings of corpus pages (pypdfium2, 110 dpi, greyscale), and
+  `eval/transcripts/*.txt` are hand transcriptions of the same pages. Both keep the licence
+  of the document they come from, as listed above. Those from `qasper-2105.03011v1.pdf` are
+  adaptations of a CC BY 4.0 work: © the paper's authors, changed by rendering or
+  transcribing single pages. They are not covered by askpdf's MIT licence.
+- `eval/questions/` and `eval/conversations/` quote short passages from the corpus as
+  evidence; the same attributions apply.
+
+## How the licences were checked
+- NIST: the notice on PDF page 3, quoted above (re-read offline by the reviewer).
+- Qasper paper: the arXiv abstract page (https://arxiv.org/abs/2105.03011) shows the CC BY
+  4.0 link; the PDF itself carries no licence. Read on 2026-10-21 and 2026-10-27.
+- NACA: the NTRS API record (https://ntrs.nasa.gov/api/citations/19930089681) has
+  `copyright.determinationType` `GOV_PUBLIC_USE_PERMITTED`; the scan has no notice. Read on
+  2026-10-21 and 2026-10-27.
 
 ## Not yet included
 - A Statistics Sweden (SCB) publication in Swedish, planned in ADR-0011. SCB's web

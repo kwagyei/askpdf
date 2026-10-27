@@ -118,10 +118,7 @@ def evidence_problems(question: Question, pages: Mapping[str, Sequence[PageRecor
         if not 1 <= p <= len(records):
             problems.append(f"{question.id}: page {p} is out of range")
             continue
-        # Header and footer lines repeat on every page, so they prove nothing.
-        record = records[p - 1]
-        lines = record.text.split("\n")
-        texts[p] = _flat(" ".join(ln for i, ln in enumerate(lines) if i not in record.boilerplate))
+        texts[p] = _body(records[p - 1])
     for quote in question.evidence:
         if not _flat(quote):  # "" is in every text
             problems.append(f"{question.id}: an empty quote proves nothing")
@@ -130,4 +127,16 @@ def evidence_problems(question: Question, pages: Mapping[str, Sequence[PageRecor
     for p, text in texts.items():
         if not any(_flat(quote) in text for quote in question.evidence):
             problems.append(f"{question.id}: page {p} holds none of the quotes")
+    # The other way round: a page that holds the evidence answers the question too, so
+    # leaving it out of the gold pages would count a correct retrieval as a miss.
+    quotes = [_flat(q) for q in question.evidence if _flat(q)]
+    for n, record in enumerate(records, start=1):
+        if n not in question.pages and any(q in _body(record) for q in quotes):
+            problems.append(f"{question.id}: page {n} also holds a quote but is not gold")
     return problems
+
+
+def _body(record: PageRecord) -> str:
+    """The page's text without header and footer lines, which repeat and prove nothing."""
+    lines = record.text.split("\n")
+    return _flat(" ".join(ln for i, ln in enumerate(lines) if i not in record.boilerplate))

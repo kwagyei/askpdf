@@ -23,6 +23,7 @@ from askpdf.evaluate.stats import (
     sign_flip_test,
 )
 from askpdf.store import PageRecord
+from tests.eval_pins import synthetic_eval
 
 EVAL = Path(__file__).resolve().parent.parent / "eval"
 in_repo = pytest.mark.skipif(not (EVAL / "questions").is_dir(), reason="eval/ is not in the sdist")
@@ -263,7 +264,7 @@ def test_unwritable_json_path_is_an_error_not_a_traceback(
 
 @in_repo
 def test_the_test_split_writes_its_release_file(tmp_path: Path) -> None:
-    shutil.copytree(EVAL, tmp_path / "eval", ignore=shutil.ignore_patterns("results", "pages"))
+    synthetic_eval(tmp_path / "eval")
     code = main(
         [
             "eval",
@@ -281,7 +282,10 @@ def test_the_test_split_writes_its_release_file(tmp_path: Path) -> None:
 
 
 @in_repo
-def test_release_pattern_rejects_near_misses(capsys: pytest.CaptureFixture[str]) -> None:
+def test_release_pattern_rejects_near_misses(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = synthetic_eval(tmp_path / "eval")
     for bad in (
         "1.0.0",
         "v1.0",
@@ -293,7 +297,7 @@ def test_release_pattern_rejects_near_misses(capsys: pytest.CaptureFixture[str])
     ):
         assert (
             main(
-                ["eval", "retrieval", "--split", "test", "--release", bad, "--eval-dir", str(EVAL)]
+                ["eval", "retrieval", "--split", "test", "--release", bad, "--eval-dir", str(fake)]
             )
             == 1
         ), bad
@@ -302,6 +306,7 @@ def test_release_pattern_rejects_near_misses(capsys: pytest.CaptureFixture[str])
 
 @in_repo
 def test_release_pattern_is_ascii_only(tmp_path: Path) -> None:
+    fake = synthetic_eval(tmp_path / "eval")
     code = main(
         [
             "eval",
@@ -311,7 +316,7 @@ def test_release_pattern_is_ascii_only(tmp_path: Path) -> None:
             "--release",
             "v\uff11.0.0",
             "--eval-dir",
-            str(EVAL),
+            str(fake),
         ]
     )
     assert code == 1
@@ -330,3 +335,25 @@ def test_results_do_not_depend_on_where_the_eval_directory_lives(tmp_path: Path)
     assert main(["eval", "retrieval", "--eval-dir", str(dest), "--json", str(out)]) == 0
     committed = json.loads((EVAL / "results" / "dev-retrieval-bm25.json").read_text("utf-8"))
     assert json.loads(out.read_text("utf-8")) == committed
+
+
+@in_repo
+@pytest.mark.parametrize("content", ["{broken", "[]", '{"release": "v9.9.9"}'])
+def test_a_damaged_release_file_is_an_error_not_a_traceback(
+    tmp_path: Path, content: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = synthetic_eval(tmp_path / "eval")
+    (fake / "results").mkdir()
+    (fake / "results" / "test-v9.9.9.json").write_text(content, encoding="utf-8")
+    argv = ["eval", "retrieval", "--split", "test", "--release", "v9.9.9", "--eval-dir", str(fake)]
+    assert main(argv) == 1
+    assert "cannot read" in capsys.readouterr().err
+
+
+def test_a_transcript_for_a_missing_page_is_an_error() -> None:
+    from askpdf.evaluate.extraction import Transcript, evaluate_pages
+
+    with pytest.raises(ValueError, match="no such page"):
+        evaluate_pages([Transcript("d", 9, "text", ())], {"d": [_page(1, "text")]})
+    with pytest.raises(ValueError, match="no such page"):
+        evaluate_pages([Transcript("other", 1, "text", ())], {"d": [_page(1, "text")]})

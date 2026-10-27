@@ -21,6 +21,8 @@ def main() -> None:
     doc = pdfium.PdfDocument(SOURCE)
     images = [doc[n - 1].render(scale=DPI / 72, grayscale=True).to_pil() for n in PAGES]
     # A fixed date (2026-10-21, as Pillow wants it) makes the file byte-for-byte reproducible.
+    # Pillow also writes the output file name as the PDF /Title, so it is identical only
+    # under this name.
     fixed = time.gmtime(1792540800)
     images[0].save(
         TARGET,

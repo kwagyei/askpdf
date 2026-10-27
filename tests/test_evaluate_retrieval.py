@@ -7,7 +7,7 @@ import pytest
 from askpdf.cli import main
 from askpdf.evaluate.questions import Question
 from askpdf.evaluate.retrieval import evaluate
-from tests.eval_pins import require_pinned_extractor
+from tests.eval_pins import require_pinned_extractor, synthetic_eval
 
 EVAL = Path(__file__).resolve().parent.parent / "eval"
 
@@ -47,9 +47,11 @@ def test_scores_are_grouped_by_kind_and_document() -> None:
     assert result["ranked"]["b"] == [["d2", 9], ["d2", 1]]
 
 
-def test_the_test_split_needs_a_release(capsys: pytest.CaptureFixture[str]) -> None:
+@pytest.mark.skipif(not (EVAL / "questions").is_dir(), reason="eval/ is not in the sdist")
+def test_the_test_split_needs_a_release(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    fake = synthetic_eval(tmp_path / "eval")  # never the real test split, even if this fails
     for extra in ([], ["--release", "next"]):
-        assert main(["eval", "retrieval", "--split", "test", "--eval-dir", str(EVAL), *extra]) == 1
+        assert main(["eval", "retrieval", "--split", "test", "--eval-dir", str(fake), *extra]) == 1
     assert "once per release" in capsys.readouterr().err
 
 

@@ -69,6 +69,17 @@ def test_evidence_must_be_on_the_cited_pages() -> None:
     assert "no document" in evidence_problems(q, {})[0]
 
 
+def test_a_page_holding_the_evidence_must_be_gold() -> None:
+    pages = {
+        "d": [
+            PageRecord(1, "1", "the timeout is 15 minutes", (), False),
+            PageRecord(2, "2", "summary: the timeout is 15 minutes", (), False),
+        ]
+    }
+    q = Question.from_json(_row(pages=[1]))
+    assert evidence_problems(q, pages) == ["q1: page 2 also holds a quote but is not gold"]
+
+
 def test_every_cited_page_needs_a_quote() -> None:
     pages = {
         "d": [

@@ -16,9 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from askpdf.evaluate.metrics import mean_scores, retrieval_scores
+from askpdf.evaluate.metrics import RETRIEVAL_METRICS, mean_scores, retrieval_scores
 from askpdf.evaluate.questions import Question, read_jsonl
 from askpdf.evaluate.retrieval import Retriever
+from askpdf.evaluate.stats import bootstrap_ci
 
 CONDITIONS = ("raw", "concat", "gold")
 
@@ -109,8 +110,18 @@ def evaluate(conversations: Sequence[Conversation], retrieve: Retriever) -> dict
             out[condition] = {m: round(v, 6) for m, v in mean_scores(chosen).items()}
         return out
 
+    intervals = {}
+    for condition in CONDITIONS:
+        values = scores[condition].values()
+        intervals[condition] = {
+            m: [round(ci.low, 6), round(ci.high, 6)]
+            for m in RETRIEVAL_METRICS
+            if values
+            for ci in [bootstrap_ci([v[m] for v in values])]
+        }
     return {
         "n_follow_ups": len(scores["raw"]),
+        "interval_95": intervals,  # percentile bootstrap, 10,000 resamples, seed 0
         "n_topic_switches": len(switches),
         "overall": means(None),
         "topic_switches": means(switches),
