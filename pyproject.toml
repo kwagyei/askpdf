@@ -47,6 +47,7 @@ askpdf = "askpdf.cli:main"
 dev = [
     "pytest>=9",
     "pytest-cov>=7",
+    "pytest-xdist>=3.8",           # `pytest -n auto` runs the suite in parallel
     "ruff>=0.17",
     "mypy>=2.0",
     "hypothesis>=6.150",

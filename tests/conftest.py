@@ -1,13 +1,19 @@
 """Test-wide guards and settings."""
 
+import hashlib
+import io
 import ipaddress
 import os
 import socket
 from collections.abc import Iterator
-from typing import Any
+from pathlib import Path
+from typing import Any, BinaryIO
 
 import pytest
 from hypothesis import settings
+
+from askpdf.extract.base import RawPage
+from askpdf.extract.pypdf_ext import PypdfExtractor
 
 # CI must be deterministic: same examples on every run, no example database, and no
 # per-example deadline (shared runners are too noisy for timing to mean anything).
@@ -130,3 +136,43 @@ def _allow_network_if_marked(
         if hasattr(socket.socket, "sendmsg"):
             monkeypatch.setattr(socket.socket, "sendmsg", _real_sendmsg)
     yield
+
+
+# --- shared extraction of the evaluation corpus ---------------------------------------------
+
+_EVAL_CORPUS = Path(__file__).resolve().parent.parent / "eval" / "corpus"
+_corpus_digests = (
+    {hashlib.sha256(p.read_bytes()).digest() for p in _EVAL_CORPUS.glob("*.pdf")}
+    if _EVAL_CORPUS.is_dir()
+    else set()
+)
+_extracted: dict[bytes, list[RawPage]] = {}
+
+
+@pytest.fixture(autouse=True)
+def _reuse_corpus_extraction(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Extract each evaluation-corpus PDF once per test run, not once per test.
+
+    Many evaluation tests index the whole corpus (129 NIST pages take seconds). Only files
+    whose bytes match a committed corpus PDF are cached, so a test that fakes pypdf's
+    behaviour on its own fixtures still sees the real extractor. The pages are frozen
+    dataclasses, so sharing them between tests is safe.
+    """
+    real = PypdfExtractor.extract
+
+    def extract(self: PypdfExtractor, source: Path | BinaryIO) -> list[RawPage]:
+        data: bytes | None = None
+        if isinstance(source, io.BytesIO):
+            data = source.getvalue()
+        elif isinstance(source, Path) and source.is_file():
+            data = source.read_bytes()
+        if data is None:  # missing, unreadable or streamed: the real extractor decides
+            return real(self, source)
+        digest = hashlib.sha256(data).digest()
+        if digest not in _corpus_digests:
+            return real(self, source)
+        if digest not in _extracted:
+            _extracted[digest] = real(self, io.BytesIO(data))
+        return list(_extracted[digest])
+
+    monkeypatch.setattr(PypdfExtractor, "extract", extract)

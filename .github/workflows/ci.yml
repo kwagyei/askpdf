@@ -58,7 +58,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --group dev
           python -m pip install .
-      - run: python -m pytest --cov
+      - run: python -m pytest --cov -n auto
 
   eval-gate:
     # Model-free evaluation (ADR-0007): a fresh run must reproduce the committed results
