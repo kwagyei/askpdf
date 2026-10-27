@@ -8,13 +8,14 @@ The remaining subcommands (serve, ask, eval, bench) arrive in later pull request
 
 import argparse
 import errno
+import io
 import os
 import sqlite3
 import sys
 import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, cast
 
 from askpdf import __version__
 from askpdf.chunking import ChunkParams
@@ -244,11 +245,34 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     return 0
 
 
-def _closed_pipe(exc: OSError) -> bool:
-    """Writing to a pipe whose reader has gone: EPIPE, or EINVAL on Windows."""
-    return isinstance(exc, BrokenPipeError) or (
-        sys.platform == "win32" and exc.errno == errno.EINVAL
-    )
+def _as_pipe_error(exc: OSError) -> OSError:
+    """On Windows a write to a pipe whose reader has gone fails with EINVAL, not EPIPE."""
+    if sys.platform == "win32" and exc.errno == errno.EINVAL:
+        return BrokenPipeError(errno.EPIPE, "the reader closed the pipe")
+    return exc
+
+
+class _Stdout(io.TextIOBase):
+    """stdout, with Windows' EINVAL on a write reported as the broken pipe it is.
+
+    Only writes to stdout are translated, so an EINVAL from anywhere else (a bad path,
+    say) still surfaces as an error instead of a silent exit.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def write(self, text: str) -> int:
+        try:
+            return self._stream.write(text)
+        except OSError as exc:
+            raise _as_pipe_error(exc) from exc
+
+    def flush(self) -> None:
+        try:
+            self._stream.flush()
+        except OSError as exc:
+            raise _as_pipe_error(exc) from exc
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -257,16 +281,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command not in commands:
         build_parser().print_help(sys.stderr)
         return 2
+    out = cast(TextIO, _Stdout(sys.stdout))
     try:
-        code = commands[args.command](args, sys.stdout, sys.stderr)
-        sys.stdout.flush()  # a closed pipe shows up here, not in Python's exit flush
+        code = commands[args.command](args, out, sys.stderr)
+        out.flush()  # a closed pipe shows up here, not in Python's exit flush
         return code
-    except OSError as exc:
-        if not _closed_pipe(exc):
-            raise
+    except BrokenPipeError:
         # The reader went away (`askpdf search … | head`). Point stdout at devnull so
         # the interpreter's final flush does not print a second error.
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
         return 1
     except KeyboardInterrupt:
         # Every document is committed in its own transaction, so the index is consistent.
