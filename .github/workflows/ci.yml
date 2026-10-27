@@ -58,7 +58,40 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --group dev
           python -m pip install .
-      - run: python -m pytest --cov
+      - run: python -m pytest --cov -n auto
+
+  eval-gate:
+    # Model-free evaluation (ADR-0007): a fresh run must reproduce the committed results
+    # exactly, so a change that moves a number has to update the file in the same PR.
+    name: Evaluation gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install package and eval tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --group eval -c eval/constraints.txt
+          python -m pip install . -c eval/constraints.txt
+      - name: Extraction matches eval/results/extraction.json
+        run: |
+          askpdf eval extraction --json "$RUNNER_TEMP/extraction.json"
+          diff -u eval/results/extraction.json "$RUNNER_TEMP/extraction.json"
+      - name: BM25 retrieval on dev matches eval/results/dev-retrieval-bm25.json
+        run: |
+          askpdf eval retrieval --split dev --json "$RUNNER_TEMP/retrieval.json"
+          diff -u eval/results/dev-retrieval-bm25.json "$RUNNER_TEMP/retrieval.json"
+      - name: Conversations on dev match eval/results/dev-conversation-bm25.json
+        run: |
+          askpdf eval conversation --split dev --json "$RUNNER_TEMP/conversation.json"
+          diff -u eval/results/dev-conversation-bm25.json "$RUNNER_TEMP/conversation.json"
+      - name: Hand-rolled metrics agree with pytrec_eval
+        run: |
+          python -m pip install --group dev -c eval/constraints.txt
+          python -m pytest tests/test_evaluate.py -k pytrec
 
   package:
     name: Build and smoke-test the wheel

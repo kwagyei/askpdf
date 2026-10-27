@@ -1,0 +1,174 @@
+{
+  "machine": "Darwin x86_64, Python 3.13.3",
+  "pages_transcribed": 8,
+  "extractors": {
+    "pypdf": {
+      "version": "6.21.2",
+      "mean_cer_with_boilerplate": 0.031331,
+      "mean_cer_without_boilerplate": 0.037395,
+      "pages_per_second": 25.2,
+      "pages": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 3,
+          "cer_with_boilerplate": 0.069283,
+          "cer_without_boilerplate": 0.077495
+        },
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 5,
+          "cer_with_boilerplate": 0.017509,
+          "cer_without_boilerplate": 0.02423
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 5,
+          "cer_with_boilerplate": 0.011117,
+          "cer_without_boilerplate": 0.027107
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 40,
+          "cer_with_boilerplate": 0.00726,
+          "cer_without_boilerplate": 0.016591
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 46,
+          "cer_with_boilerplate": 0.00647,
+          "cer_without_boilerplate": 0.014726
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 1,
+          "cer_with_boilerplate": 0.122845,
+          "cer_without_boilerplate": 0.122845
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "cer_with_boilerplate": 0.013385,
+          "cer_without_boilerplate": 0.013385
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "cer_with_boilerplate": 0.002782,
+          "cer_without_boilerplate": 0.002782
+        }
+      ]
+    },
+    "pdfplumber": {
+      "version": "0.11.10",
+      "mean_cer_with_boilerplate": 0.260005,
+      "mean_cer_without_boilerplate": 0.262031,
+      "pages_per_second": 6.6,
+      "pages": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 3,
+          "cer_with_boilerplate": 0.078479,
+          "cer_without_boilerplate": 0.086795
+        },
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 5,
+          "cer_with_boilerplate": 0.017009,
+          "cer_without_boilerplate": 0.023725
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 5,
+          "cer_with_boilerplate": 0.0,
+          "cer_without_boilerplate": 0.001179
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 40,
+          "cer_with_boilerplate": 0.0,
+          "cer_without_boilerplate": 0.0
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 46,
+          "cer_with_boilerplate": 0.0,
+          "cer_without_boilerplate": 0.0
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 1,
+          "cer_with_boilerplate": 0.713166,
+          "cer_without_boilerplate": 0.713166
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "cer_with_boilerplate": 0.52454,
+          "cer_without_boilerplate": 0.52454
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "cer_with_boilerplate": 0.746844,
+          "cer_without_boilerplate": 0.746844
+        }
+      ]
+    },
+    "pypdfium2": {
+      "version": "5.14.0",
+      "mean_cer_with_boilerplate": 0.030781,
+      "mean_cer_without_boilerplate": 0.036849,
+      "pages_per_second": 223.0,
+      "pages": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 3,
+          "cer_with_boilerplate": 0.068056,
+          "cer_without_boilerplate": 0.076255
+        },
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 5,
+          "cer_with_boilerplate": 0.018509,
+          "cer_without_boilerplate": 0.02524
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 5,
+          "cer_with_boilerplate": 0.011117,
+          "cer_without_boilerplate": 0.027107
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 40,
+          "cer_with_boilerplate": 0.007985,
+          "cer_without_boilerplate": 0.017345
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 46,
+          "cer_with_boilerplate": 0.006794,
+          "cer_without_boilerplate": 0.01506
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 1,
+          "cer_with_boilerplate": 0.111089,
+          "cer_without_boilerplate": 0.111089
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "cer_with_boilerplate": 0.01478,
+          "cer_without_boilerplate": 0.01478
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "cer_with_boilerplate": 0.007918,
+          "cer_without_boilerplate": 0.007918
+        }
+      ]
+    }
+  }
+}

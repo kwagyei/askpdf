@@ -36,21 +36,85 @@ so a bad answer can be traced to where it went wrong:
 
 | Stage | Question it answers | Status |
 | --- | --- | --- |
-| Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | planned |
-| Retrieval | Did we find the right page? (recall@k, MRR, nDCG) | planned |
+| Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
+| Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25 measured |
 | Grounding | Does the cited page actually contain the quote? | planned |
 | Abstention | Does it say "not found" instead of guessing? | planned |
-| Follow-ups | Are follow-up questions rewritten correctly? | planned |
+| Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
 | Latency | How long does it take on an 8 GB laptop without a GPU? | planned |
 
-Tuning happens on a development split; the test split is frozen and scored once per release.
-Questions written by people who had not seen the answer (Qasper) complement the in-house set.
+Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
+once per release. Questions from the Qasper dataset, written by people who had seen only
+a paper's title and abstract, were planned as an outside check but were cut to ship
+sooner; the limitations below say what that leaves. A CI job reruns every model-free number below, checks these tables against the results
+files, and fails if a number changes without them.
+
+### First results (development split, model-free)
+
+<!-- results:extraction -->
+Extraction with pypdf 6.21.2, on 8 hand-transcribed pages from a security
+standard, a two-column paper and a 1957 scanned report:
+
+| Measure | Result |
+| --- | --- |
+| Mean character error rate | 0.031 (best page 0.003, worst 0.123) |
+| Header/footer detection, precision / recall | 1.000 / 0.553 |
+| Scanned-page detection, precision / recall | 1.000 / 1.000 (2 pages without text) |
+<!-- /results -->
+
+The worst pages are the scan, whose OCR layer reads "65A004" as "65AOOi-", and the
+paper's title page, where a figure interrupts the reading order. Header recall is low
+because the scan's OCR mangles each page's header differently, so it never repeats.
+
+<!-- results:retrieval -->
+Keyword retrieval (BM25) over the whole corpus, 49 answerable dev questions:
+
+| Questions | n | hit@1 | hit@5 | MRR@10 | nDCG@10 |
+| --- | --- | --- | --- | --- | --- |
+| all | 49 | 0.592 | 0.878 | 0.712 | 0.768 |
+| lexical | 13 | 0.923 | 1.000 | 0.949 | 0.955 |
+| multi-page | 1 | 0.000 | 1.000 | 0.200 | 0.456 |
+| paraphrase | 26 | 0.423 | 0.769 | 0.578 | 0.648 |
+| scanned | 5 | 0.800 | 1.000 | 0.900 | 0.936 |
+| table | 4 | 0.500 | 1.000 | 0.708 | 0.800 |
+
+95% bootstrap intervals for the overall row: hit@1 0.45 to 0.73, nDCG@10 0.68 to 0.85.
+<!-- /results -->
+
+With so few questions per row, only the overall row and the lexical/paraphrase contrast
+mean much. BM25 finds questions that reuse the document's words (lexical) far more
+often than paraphrased ones. That gap is what the dense and hybrid retrievers have to
+close, and each is adopted only if a paired test on dev says it helps. The follow-ups
+below are even fewer, so their intervals are wide.
+
+<!-- results:conversation -->
+Follow-up questions (14 on dev, such as "What about at AAL3?"), searched three ways:
+
+| Follow-up searched | hit@1 (95% interval) | nDCG@10 |
+| --- | --- | --- |
+| as typed | 0.429 (0.21 to 0.71) | 0.620 |
+| history joined | 0.500 (0.21 to 0.79) | 0.754 |
+| hand-written rewrite | 0.857 (0.64 to 1.00) | 0.933 |
+<!-- /results -->
+
+**Who wrote the evaluation data.** The questions, conversations and page transcriptions
+were drafted by an AI model (Claude) working as the project's lead developer, and are
+being checked by hand by the author. The questions were written from askpdf's extracted
+text, so they lean towards passages the extractor reads well; self-written questions also
+favour lexical retrieval. Questions written blind by outsiders would offset both; that
+check is not part of this version. (The in-house questions with ids `qasper-*` are about
+the paper that introduced Qasper, one of the corpus documents; they are not from the
+dataset.) Every setting chosen on the data is logged in `eval/TUNING.md`. On the
+scanned report, evidence quotes follow its OCR layer, misreadings included, because they are
+checked against the text askpdf actually extracts. The corpus files and their licences are
+listed in `eval/corpus/SOURCES.md`.
 
 ## Known limitations (so far)
 
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.
-  Extractors are compared on hand-transcribed pages before v0.1.
+  On the 8 transcribed pages pypdfium2 ties with pypdf (character error rate 0.031) and
+  pdfplumber reads across two-column pages (0.260), so pypdf stays.
 - PDFs that need a password to open are skipped with the reason shown. PDFs that open
   with an empty password (RC4 or AES) are read, including ones marked "no copying" or "no
   printing": askpdf reads your own files locally and does not enforce those advisory
@@ -58,7 +122,7 @@ Questions written by people who had not seen the answer (Qasper) complement the 
 - A word broken across lines at a hyphen is rejoined without the hyphen only if the same
   document spells it solid more often than hyphenated; otherwise the hyphen stays. So
   "multi-factor" stays a compound, but a word broken by layout that the document uses only
-  once keeps a stray hyphen ("algo-rithm"). How often that happens is measured before v0.1.
+  once keeps a stray hyphen ("algo-rithm"). How often that happens is not measured.
   Header and footer lines are never joined to the text, but they are only recognised in
   documents of 4 pages or more; in a shorter one, a page number under a hyphenated last
   line can end up glued on ("multi-3").
@@ -66,7 +130,11 @@ Questions written by people who had not seen the answer (Qasper) complement the 
   stopword list. Languages written without spaces between words (Thai, Chinese, Japanese)
   are matched only as whole runs of text, and "authenticate" does not find "authenticator".
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
-  as Persian or Devanagari. The test corpus is English and Swedish.
+  as Persian or Devanagari.
+- The evaluation is small and self-written: 4 English documents, 111 questions and 12
+  conversations, drafted by the lead developer (an AI model) and not checked against
+  questions written blind by outsiders. Its intervals are wide, and it says more about
+  relative differences (lexical versus paraphrased questions) than about absolute quality.
 
 ## Development
 

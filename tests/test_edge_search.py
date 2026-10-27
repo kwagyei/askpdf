@@ -128,10 +128,12 @@ def test_snapshot_never_mixes_generations_with_a_writer_in_another_process(
     writer = textwrap.dedent(
         """
         import sys
+        import time
         from pathlib import Path
         from askpdf.store import ChunkRecord, FileRow, PageRecord, Store
         with Store(Path(sys.argv[1])) as s:
             for n in range(60):
+                time.sleep(0.005)  # let the reader interleave, even on a busy machine
                 pages = {p: [f"doc{n} p{p}"] for p in (1, 2, 3)}
                 s.put_document(
                     FileRow(f"{n}.pdf", f"{n:064d}", 1, 1, "indexed", None),
@@ -140,22 +142,30 @@ def test_snapshot_never_mixes_generations_with_a_writer_in_another_process(
                 )
         """
     )
-    proc = subprocess.Popen([sys.executable, "-I", "-c", writer, str(db)])  # noqa: S603
-    try:
-        with Store(db) as reader:
-            seen: set[int] = set()
-            while proc.poll() is None or not seen:
+
+    def check(snap: Snapshot) -> None:
+        per_doc: dict[str, int] = {}
+        for c in snap.chunks:
+            per_doc[c.sha256] = per_doc.get(c.sha256, 0) + 1
+        for sha, count in per_doc.items():
+            assert count == (1 if sha == "f" * 64 else 3)
+        assert set(per_doc) == set(snap.paths)
+        assert len(per_doc) == snap.generation
+
+    seen: set[int] = set()
+    with Store(db) as reader:
+        Snapshot.load(reader)  # build the tokenizer's tables before the race starts
+        proc = subprocess.Popen([sys.executable, "-I", "-c", writer, str(db)])  # noqa: S603
+        try:
+            while proc.poll() is None:
                 snap = Snapshot.load(reader)
-                per_doc: dict[str, int] = {}
-                for c in snap.chunks:
-                    per_doc[c.sha256] = per_doc.get(c.sha256, 0) + 1
-                for sha, count in per_doc.items():
-                    assert count == (1 if sha == "f" * 64 else 3)
-                assert set(per_doc) == set(snap.paths)
-                assert len(per_doc) == snap.generation
+                check(snap)
                 seen.add(snap.generation)
-    finally:
-        proc.wait()
+        finally:
+            proc.wait()
+        snap = Snapshot.load(reader)  # and once after the writer is done
+        check(snap)
+        seen.add(snap.generation)
     assert proc.returncode == 0
     assert len(seen) > 1
 

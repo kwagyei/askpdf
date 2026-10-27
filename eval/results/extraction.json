@@ -1,0 +1,55 @@
+{
+  "stage": "extraction",
+  "extractor": "pypdf 6.21.2",
+  "pages": [
+    {
+      "doc": "naca-rm-l56l14a",
+      "page": 3,
+      "cer": 0.069283
+    },
+    {
+      "doc": "naca-rm-l56l14a",
+      "page": 5,
+      "cer": 0.017509
+    },
+    {
+      "doc": "nist-sp-800-63b-4",
+      "page": 5,
+      "cer": 0.011117
+    },
+    {
+      "doc": "nist-sp-800-63b-4",
+      "page": 40,
+      "cer": 0.00726
+    },
+    {
+      "doc": "nist-sp-800-63b-4",
+      "page": 46,
+      "cer": 0.00647
+    },
+    {
+      "doc": "qasper-2105.03011v1",
+      "page": 1,
+      "cer": 0.122845
+    },
+    {
+      "doc": "qasper-2105.03011v1",
+      "page": 4,
+      "cer": 0.013385
+    },
+    {
+      "doc": "qasper-2105.03011v1",
+      "page": 6,
+      "cer": 0.002782
+    }
+  ],
+  "mean_cer": 0.031331,
+  "boilerplate": {
+    "precision": 1.0,
+    "recall": 0.553191
+  },
+  "scanned": {
+    "precision": 1.0,
+    "recall": 1.0
+  }
+}

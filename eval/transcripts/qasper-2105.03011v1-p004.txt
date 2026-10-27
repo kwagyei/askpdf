@@ -1,0 +1,20 @@
+Question	Type	%	Paper(s)
+What datasets do they use?	General	33.3%	1; 2; 3
+What other political events are included in the database?	Specific	66.7%	1706.01875
+Question	Answer	Type	%	Paper
+What five dialogue attributes were analyzed?	Model; Confidence; Continuity; Query-relatedness; Repetitiveness; Specificity	Extractive	51.8%	1705.00571
+Which neural architecture do they use as a base for their attention conflict mechanisms?	GRU-based encoder, interaction block, and classifier consisting of stacked fully-connected layers.	Abstractive	24.2%	1906.08593
+Do they ensure the that the architecture is differentiable everywhere after adding the Hungarian layer?	Yes	Yes/No	13.9%	1712.02555
+What language are the captions in?	N/A	Unanswer.	10.2%	1909.09070
+Question	Evidence	Type	%	Paper
+What new tasks do they use to show the transferring ability of the shared meta-knowledge?	To test the transferability of our learned Meta-LSTM, we also design an experiment, in which we take turns choosing 15 tasks to train our model with multi-task learning, then the learned Meta-LSTM are transferred to the remaining one task. The parameters of transferred Meta-LSTM, θm(s) in Eq.( 33 ), are fixed and cannot be updated on the new task.	Text	81.6%	1802.08969
+How much does it minimally cost to fine-tune some model according to benchmarking framework?	Table 1	Table/Figure	11.6%	2002.05829
+Do they recommend translating the premise and hypothesis together?	N/A	None	12.8%	2004.04721
+Table 1: Examples of questions (top), answers (middle), and evidence (bottom) sampled from Qasper. % are relative frequencies of the corresponding type over all examples in Qasper. The percentages for evidence types sum over 100% due to double-counting of 446 answers with both Table/Figure and Text evidence.
+section, and perform some section name normalization. We find that among the frequently used section names such as “Experiments” and “Introduction,” there was not a single section name that contained a majority of evidence spans, indicating that the distribution of evidence over section in the paper was more or less uniform.
+Inter-annotator agreement 44% of the questions in Qasper have multiple annotated answers. On average, each question is answered by 1.6 annotators (up to a maximum of 6 annotators for the same question). Using these multiple annotations, we compute some measures of agreement between annotators. First, we found that there is a high level of agreement (90%) regarding answerability of questions. Second, we find that annotators agreed on the type of the evidence (text vs. figure) in 84.0% of the cases. Papers often provide the same information both in tables and text, and agreement over the evidence types could be a consequence of our clear annotation guidelines regarding selecting evidence.
+Correctness To estimate the correctness of the answer annotations in Qasper, we manually analyzed 100 randomly sampled questions with multiple answer annotations (averaging 2.73 answers per question). We found that 207 (75.8%) of the answers were correct. 98% of the questions had at least one correct answer, and 77% had most of the answers correct.
+4 Modeling Qasper
+This section explains the task, evaluation metrics, and a model addressing Qasper tasks.
+4.1 Task Setup
+We formally define the Qasper tasks as follows: Given a paper, and a question about it, the primary task is to determine if the question is answerable, and output a predicted answer, that is one or more spans in the full-text of the paper, yes, no or other free-form text. A system built for this will be eval-

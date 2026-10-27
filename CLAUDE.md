@@ -12,7 +12,7 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
 - src layout (`src/askpdf/`), hatchling, MIT; installed via `pipx install git+…`, not on PyPI
 - Runtime deps only: pypdf, numpy, fastapi, uvicorn, pycryptodome (pypdf's AES backend;
   `cryptography` has no Intel-Mac wheels). Everything else is stdlib.
-- Dependency groups (pip >= 25.1): `dev` (pytest, hypothesis, ruff, mypy, httpx,
+- Dependency groups (pip >= 25.1): `dev` (pytest, pytest-xdist, hypothesis, ruff, mypy, httpx,
   pytrec-eval-terrier) and `eval` (jiwer, pdfplumber, pypdfium2, rapidfuzz)
 - Models via Ollama's native API (llama3.2:3b, nomic-embed-text); optional BYOK chat only
 
@@ -21,7 +21,8 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
 ```sh
 python3.13 -m venv .venv && .venv/bin/pip install --upgrade pip
 .venv/bin/pip install --group dev && .venv/bin/pip install .   # reinstall after src changes
-.venv/bin/pytest --cov          # coverage floor 90%, branch coverage
+.venv/bin/pytest -n auto         # whole suite in parallel, ~20 s
+.venv/bin/pytest --cov -n auto  # coverage floor 90%, branch coverage
 .venv/bin/ruff check && .venv/bin/ruff format --check && .venv/bin/mypy
 ```
 

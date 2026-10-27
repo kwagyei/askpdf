@@ -1,0 +1,14 @@
+[header] 4
+[header] NACA RM L56L14a
+Λ	angle of sweepback of wing quarter-chord line, deg
+ρ	air density, slugs/cu ft
+ω	angular frequency of flutter, radians/sec
+ωh,i	angular bending frequency, 2πfh,i, radians/sec
+ωα	angular uncoupled first torsion frequency, 2πfα, radians/sec
+Subscripts:
+e	experimental values
+R	calculated values
+MODELS
+The wing of the present investigation had a sweepback angle of 10° along the quarter-chord line, an aspect ratio of 4, a taper ratio of 0.6, NACA 65A004 streamwise airfoil sections, and a ratio of sting-fuselage diameter to wing span of 0.22. The model wing panels were connected by a mounting block which fitted flush with the sting-fuselage and was an integral part of the wing. (See fig. 1.) In accordance with the three-digit designation code of reference 1, this wing is designated a 410 wing (the first digit is the aspect ratio to the nearest integer and the last two digits give the sweepback angle in degrees). The basic dimensions of the model are shown in figure 1.
+Because of the destruction of the models by flutter, three models were needed to obtain the desired data. The models were constructed of solid Consoweld (ref. 2), a phenolic laminate material with high-strength paper reinforcement.
+Measurements were made of the following physical parameters on each wing panel of each model: elastic axis position, structural damping coefficient in bending, and the first four coupled natural frequencies and the node lines associated with the second, third, and fourth coupled frequencies. The frequencies and node lines which were measured are presented in figure 2. On the right panel of model 3 the spanwise variations of the following parameters were determined and are presented in table I: mass, center-of-gravity location, and the square of the radius of gyration (taken about elastic axis). Also presented in table I are certain basic wing geometric parameters which were the same for all models; for each panel of each model a tabulation is given of the lower

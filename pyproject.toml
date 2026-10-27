@@ -47,6 +47,7 @@ askpdf = "askpdf.cli:main"
 dev = [
     "pytest>=9",
     "pytest-cov>=7",
+    "pytest-xdist>=3.8",           # `pytest -n auto` runs the suite in parallel
     "ruff>=0.17",
     "mypy>=2.0",
     "hypothesis>=6.150",
@@ -60,8 +61,8 @@ eval = [
     "pypdfium2>=5.0",   # extractor comparison and page rendering
     "rapidfuzz>=3.14",  # Qasper paragraph-to-page mapping
     # pdfminer.six (via pdfplumber) needs cryptography, which stopped publishing Intel-Mac
-    # wheels in 49.0.0 (ADR-0001 Amendment 1). Not yet verified: check on the Intel Mac in
-    # PR 4 with `pip install --group eval --only-binary :all:`.
+    # wheels in 49.0.0 (ADR-0001 Amendment 1). Checked 2026-10-21 on the Intel Mac, Python 3.13:
+    # `pip install --group eval --only-binary :all:` resolves cryptography 48.0.1.
     "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
@@ -81,11 +82,18 @@ known-first-party = ["askpdf"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S106"]  # assert; test PDFs use fixed passwords
+# The question set is data: long lines, and quotes copied verbatim, curly quotes included.
+"eval/tools/questions_source.py" = ["E501", "RUF001"]
+"eval/tools/conversations_source.py" = ["E501", "RUF001"]
 
 [tool.mypy]
 strict = true
 python_version = "3.12"
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["jiwer"]  # eval group only, and untyped
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
