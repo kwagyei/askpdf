@@ -1,6 +1,7 @@
 """Snapshots, page ranking and the `search` command."""
 
 import errno
+import io
 import sqlite3
 import subprocess
 import sys
@@ -304,21 +305,45 @@ def test_a_closed_pipe_exits_quietly(folder: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("error", "platform", "closed"),
+    ("error", "platform", "pipe"),
     [
-        (BrokenPipeError(), "linux", True),
         (OSError(errno.EINVAL, "Invalid argument"), "win32", True),
         (OSError(errno.EINVAL, "Invalid argument"), "linux", False),  # a real error there
         (OSError(errno.ENOSPC, "No space left"), "win32", False),
     ],
 )
-def test_what_counts_as_a_closed_pipe(
-    error: OSError, platform: str, closed: bool, monkeypatch: pytest.MonkeyPatch
+def test_a_failed_write_to_stdout_is_a_broken_pipe_only_when_it_is_one(
+    error: OSError, platform: str, pipe: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from askpdf.cli import _closed_pipe
+    from askpdf.cli import _Stdout
+
+    class Failing(io.StringIO):
+        def write(self, text: str) -> int:
+            raise error
+
+        def flush(self) -> None:
+            raise error
 
     monkeypatch.setattr(sys, "platform", platform)
-    assert _closed_pipe(error) is closed
+    out = _Stdout(Failing())
+    for action in (lambda: out.write("x"), out.flush):
+        with pytest.raises(OSError) as info:
+            action()
+        assert isinstance(info.value, BrokenPipeError) is pipe
+
+
+def test_einval_outside_stdout_is_not_mistaken_for_a_closed_pipe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import askpdf.cli as cli
+
+    def bad_path(*args: object) -> int:
+        raise OSError(errno.EINVAL, "Invalid argument")
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setitem(cli.main.__globals__, "cmd_docs", bad_path)
+    with pytest.raises(OSError, match="Invalid argument"):
+        cli.main(["docs", "."])
 
 
 def test_other_write_errors_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
