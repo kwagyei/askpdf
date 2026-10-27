@@ -46,8 +46,7 @@ so a bad answer can be traced to where it went wrong:
 Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
 once per release. Questions from the Qasper dataset, written by people who had seen only
 a paper's title and abstract, were planned as an outside check but were cut to ship
-sooner; the limitations below say what that leaves.
-A CI job reruns every model-free number below, checks these tables against the results
+sooner; the limitations below say what that leaves. A CI job reruns every model-free number below, checks these tables against the results
 files, and fails if a number changes without them.
 
 ### First results (development split, model-free)
@@ -103,8 +102,9 @@ were drafted by an AI model (Claude) working as the project's lead developer, an
 being checked by hand by the author. The questions were written from askpdf's extracted
 text, so they lean towards passages the extractor reads well; self-written questions also
 favour lexical retrieval. Questions written blind by outsiders would offset both; that
-check is not part of this version. (The in-house questions with ids `qasper-*` are about the paper
-that introduced Qasper, one of the corpus documents; they are not from the dataset.) On the
+check is not part of this version. (The in-house questions with ids `qasper-*` are about
+the paper that introduced Qasper, one of the corpus documents; they are not from the
+dataset.) Every setting chosen on the data is logged in `eval/TUNING.md`. On the
 scanned report, evidence quotes follow its OCR layer, misreadings included, because they are
 checked against the text askpdf actually extracts. The corpus files and their licences are
 listed in `eval/corpus/SOURCES.md`.
@@ -130,8 +130,11 @@ listed in `eval/corpus/SOURCES.md`.
   stopword list. Languages written without spaces between words (Thai, Chinese, Japanese)
   are matched only as whole runs of text, and "authenticate" does not find "authenticator".
 - Zero-width joiners are removed while cleaning, which can change words in scripts such
-  as Persian or Devanagari. The evaluation corpus is English only so far; a Swedish
-  document is planned.
+  as Persian or Devanagari.
+- The evaluation is small and self-written: 4 English documents, 111 questions and 12
+  conversations, drafted by the lead developer (an AI model) and not checked against
+  questions written blind by outsiders. Its intervals are wide, and it says more about
+  relative differences (lexical versus paraphrased questions) than about absolute quality.
 
 ## Development
 
