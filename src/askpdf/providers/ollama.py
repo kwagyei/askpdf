@@ -19,6 +19,7 @@ CHAT_MODEL = "llama3.2:3b"
 DOCUMENT_PREFIX = "search_document: "
 QUERY_PREFIX = "search_query: "
 BATCH = 16  # chunks per request: small enough to pause between batches while answering
+CONTEXT = 8192  # nomic-embed-text's maximum input, in tokens
 
 
 def base_url() -> str:
@@ -40,14 +41,16 @@ class OllamaEmbedder:
             batch = list(texts[start : start + BATCH])
             reply = http.post_json(
                 f"{self.url}/api/embed",
-                # truncate false: a chunk longer than the model's window is an error,
-                # not a silently shortened vector.
-                {"model": self.model, "input": batch, "truncate": False},
+                {
+                    "model": self.model,
+                    "input": batch,
+                    # A chunk longer than the window is an error, not a silently
+                    # shortened vector; the window is the model's full 8192 tokens.
+                    "truncate": False,
+                    "options": {"num_ctx": CONTEXT},
+                },
             )
-            vectors = reply.get("embeddings") if isinstance(reply, dict) else None
-            if not isinstance(vectors, list) or len(vectors) != len(batch):
-                raise http.ProviderError(f"unexpected reply from Ollama /api/embed: {reply!r:.200}")
-            rows.extend(vectors)
+            rows.extend(_vectors(reply, len(batch)))
         if not rows:
             return np.zeros((0, 0), dtype=np.float32)
         return normalise(rows)
@@ -57,6 +60,21 @@ class OllamaEmbedder:
 
     def embed_query(self, text: str) -> Matrix:
         return self._embed([QUERY_PREFIX + text]).reshape(-1)
+
+
+def _vectors(reply: object, expected: int) -> list[list[float]]:
+    """The reply's vectors, checked: one per input, all the same length, all finite."""
+    vectors = reply.get("embeddings") if isinstance(reply, dict) else None
+    try:
+        matrix = np.asarray(vectors, dtype=np.float64)
+    except (TypeError, ValueError):
+        matrix = np.zeros((0,))
+    if matrix.ndim != 2 or matrix.shape[0] != expected or matrix.shape[1] == 0:
+        raise http.ProviderError(f"unexpected reply from Ollama /api/embed: {reply!r:.200}")
+    if not np.isfinite(matrix).all():
+        raise http.ProviderError("Ollama returned a vector with NaN or infinite values")
+    rows: list[list[float]] = matrix.tolist()
+    return rows
 
 
 @dataclass(frozen=True)
@@ -78,11 +96,16 @@ class OllamaChat:
             event = _json(line)
             if "error" in event:
                 raise http.ProviderError(f"Ollama: {event['error']}")
-            piece = event.get("message", {}).get("content", "")
+            message = event.get("message") or {}
+            piece = message.get("content", "") if isinstance(message, dict) else None
+            if not isinstance(piece, str):
+                raise http.ProviderError(f"Ollama sent an unexpected message: {line[:200]!r}")
             if piece:
                 yield piece
             if event.get("done"):
                 return
+        # The stream closed without "done": the answer may be cut short.
+        raise http.ProviderError("Ollama's answer ended before it was complete")
 
 
 def _json(line: str) -> dict[str, Any]:

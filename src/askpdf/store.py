@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: chunk ids are never reused
 
 _SCHEMA = """
 CREATE TABLE meta (
@@ -50,7 +50,9 @@ CREATE TABLE pages (
     PRIMARY KEY (sha256, page)
 );
 CREATE TABLE chunks (
-    id         INTEGER PRIMARY KEY,
+    -- AUTOINCREMENT: an id is never reused, so a vector computed for a chunk that was
+    -- deleted meanwhile can never land on a new chunk.
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
     sha256     TEXT NOT NULL,
     page       INTEGER NOT NULL,
     ordinal    INTEGER NOT NULL,
@@ -521,6 +523,11 @@ class Store:
                 [(cid, blob, cid) for cid, blob in rows],
             )
             self._bump_generation()
+
+    def vector_dim(self) -> int | None:
+        """The length of the stored vectors, or None if there are none yet."""
+        row = self._db.execute("SELECT length(vector) FROM vectors LIMIT 1").fetchone()
+        return None if row is None else int(row[0]) // 4
 
     def all_vectors(self) -> dict[int, bytes]:
         return dict(self._db.execute("SELECT chunk_id, vector FROM vectors").fetchall())

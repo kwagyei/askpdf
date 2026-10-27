@@ -37,11 +37,15 @@ class OpenAICompatChat:
             try:
                 event = json.loads(data)
                 piece = (event["choices"][0].get("delta") or {}).get("content") or ""
+                if not isinstance(piece, str):
+                    raise TypeError(piece)
             except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
                 message = f"unexpected event from {self.url}: {data[:200]!r}"
                 raise http.ProviderError(message) from exc
             if piece:
                 yield piece
+        # The stream closed without [DONE]: the answer may be cut short.
+        raise http.ProviderError(f"the answer from {self.url} ended before it was complete")
 
 
 def allow_remote(flag: bool = False) -> bool:

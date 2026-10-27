@@ -78,7 +78,8 @@ def load_embedded_snapshot(corpus: Path, embedder: Embedder, index: Path) -> Sna
     """Index and embed the corpus into a lasting index, so later runs skip the slow part."""
     with Store(index) as store:
         index_folder(corpus, store, PypdfExtractor(), ChunkParams())
-        embed_missing(store, embedder)
+        if embed_missing(store, embedder).refused:
+            raise ValueError("the model refused to embed some corpus chunks")
         return Snapshot.load(store)
 
 

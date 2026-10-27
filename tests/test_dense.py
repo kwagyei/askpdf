@@ -48,8 +48,8 @@ def store(tmp_path: Path) -> Iterator[Store]:
 
 
 def test_missing_vectors_are_filled_in_and_a_second_run_does_nothing(store: Store) -> None:
-    assert embed_missing(store, WordEmbedder()) == 3
-    assert embed_missing(store, WordEmbedder()) == 0
+    assert embed_missing(store, WordEmbedder()).embedded == 3
+    assert embed_missing(store, WordEmbedder()).embedded == 0
     snapshot = Snapshot.load(store)
     assert snapshot.fully_embedded and snapshot.vectors.shape == (3, 32)
     assert not snapshot.vectors.flags.writeable
@@ -134,6 +134,7 @@ def test_index_with_ollama_embeds_and_dense_search_uses_it(
             assert main(_search(folder, "--retriever", retriever, "-k", "1")) == 0
             captured = capsys.readouterr()
             assert "page 2" in captured.out and "keyword" not in captured.err
+            assert {"dense": "cosine ", "hybrid": "rrf "}[retriever] in captured.out
     with sqlite3.connect(folder.parent / "i.db") as db:
         assert db.execute("SELECT count(*) FROM vectors").fetchone()[0] == 2
 

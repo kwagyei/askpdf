@@ -22,7 +22,8 @@ from askpdf.chunking import ChunkParams, chunk_page
 from askpdf.extract import clean
 from askpdf.extract.base import ExtractionError, Extractor, RawPage
 from askpdf.extract.clean import clean_document, clean_text, detect_boilerplate
-from askpdf.providers.base import Embedder
+from askpdf.providers.base import Embedder, Matrix
+from askpdf.providers.http import ProviderError, UnreachableError
 from askpdf.store import ChunkRecord, FileRow, PageRecord, Store, folder_key
 
 PIN_SCHEMA = 1
@@ -221,25 +222,58 @@ def index_folder(
     return report
 
 
+@dataclass
+class EmbedReport:
+    embedded: int = 0
+    refused: list[int] = field(default_factory=list)  # chunk ids the model would not embed
+
+
 def embed_missing(
     store: Store, embedder: Embedder, on_batch: Callable[[int, int], None] | None = None
-) -> int:
-    """Embed every chunk that has no vector yet; return how many were embedded.
+) -> EmbedReport:
+    """Embed every chunk that has no vector yet.
 
     Runs after indexing, and on every later run, so an index built while Ollama was not
     running catches up instead of being rebuilt. ``on_batch(done, total)`` reports
-    progress. A provider error propagates; batches already stored are kept.
+    progress. If Ollama cannot be reached the error propagates and the batches already
+    stored are kept. A chunk the model refuses (too long, say) is skipped and reported,
+    so it cannot block the others; it stays findable by keyword search.
     """
     todo = store.chunks_without_vectors()
+    report = EmbedReport()
+    dim = store.vector_dim()
     for start in range(0, len(todo), EMBED_BATCH):
         batch = todo[start : start + EMBED_BATCH]
-        vectors = embedder.embed_documents([text for _, text in batch])
-        store.put_vectors(
-            [
-                (cid, vector.astype("<f4").tobytes())
-                for (cid, _), vector in zip(batch, vectors, strict=True)
-            ]
-        )
+        rows = _embed_batch(embedder, batch, report)
+        for _, vector in rows:
+            if dim is None:
+                dim = len(vector)
+            elif len(vector) != dim:
+                raise ProviderError(
+                    f"the embedding model now returns {len(vector)}-dimensional vectors but"
+                    f" the index holds {dim}-dimensional ones; delete {store.path} and index again"
+                )
+        store.put_vectors([(cid, v.astype("<f4").tobytes()) for cid, v in rows])
+        report.embedded += len(rows)
         if on_batch is not None:
             on_batch(start + len(batch), len(todo))
-    return len(todo)
+    return report
+
+
+def _embed_batch(
+    embedder: Embedder, batch: list[tuple[int, str]], report: EmbedReport
+) -> list[tuple[int, Matrix]]:
+    try:
+        vectors = embedder.embed_documents([text for _, text in batch])
+        return [(cid, v) for (cid, _), v in zip(batch, vectors, strict=True)]
+    except UnreachableError:
+        raise
+    except ProviderError:
+        if len(batch) == 1:
+            report.refused.append(batch[0][0])
+            return []
+    # One chunk in the batch was refused: embed them one at a time to find it.
+    rows: list[tuple[int, Matrix]] = []
+    for item in batch:
+        rows.extend(_embed_batch(embedder, [item], report))
+    return rows

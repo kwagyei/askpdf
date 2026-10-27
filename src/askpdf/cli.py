@@ -219,19 +219,28 @@ def _embedder(args: argparse.Namespace) -> OllamaEmbedder:
 def _embed(args: argparse.Namespace, store: Store, err: TextIO) -> int | None:
     """Embed the chunks that have no vector yet; None if that was not possible."""
     try:
-        embedder = _embedder(args)
-        return embed_missing(
+        report = embed_missing(
             store,
-            embedder,
+            _embedder(args),
             on_batch=lambda done, total: print(f"embedding {done}/{total} chunks", file=err),
         )
-    except http.ProviderError as exc:
+    except http.UnreachableError as exc:
         print(
             f"semantic search unavailable ({shown(str(exc))}); indexed for keyword search."
             " Start Ollama (ollama serve) and run index again to add it.",
             file=err,
         )
         return None
+    except http.ProviderError as exc:
+        print(f"semantic search unavailable: {shown(str(exc))}", file=err)
+        return None
+    if report.refused:
+        print(
+            f"{_plural(len(report.refused), 'chunk')} could not be embedded (the model refused"
+            " them, e.g. too long); they are found by keyword search only",
+            file=err,
+        )
+    return report.embedded
 
 
 def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
@@ -436,10 +445,15 @@ def _snippet(text: str) -> str:
     return flat if len(flat) <= SNIPPET_CHARS else flat[: SNIPPET_CHARS - 1].rstrip() + "…"
 
 
-def _print_hit(rank: int, hit: PageHit, out: TextIO) -> None:
+# The three retrievers score on different scales, so the number says which one it is.
+SCORE_NAMES = {"bm25": "score", "dense": "cosine", "hybrid": "rrf"}
+
+
+def _print_hit(rank: int, hit: PageHit, out: TextIO, retriever: str = "bm25") -> None:
     name = shown(hit.paths[0]) if hit.paths else hit.sha256[:12]
     where = page_ref(hit.page, shown(hit.label))
-    print(f"{rank}. {name}  {where}  score {hit.score:.2f}", file=out)
+    digits = 4 if retriever == "hybrid" else 2  # RRF scores are around 1/60
+    print(f"{rank}. {name}  {where}  {SCORE_NAMES[retriever]} {hit.score:.{digits}f}", file=out)
     print(f"   {shown(_snippet(hit.best_chunk.text))}", file=out)
 
 
@@ -462,32 +476,42 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
                 f" run: askpdf index {args.path}",
             )
         snapshot = Snapshot.load(store)
-    hits = _search(args, snapshot, err)
+    hits, used = _search(args, snapshot, err)
     if not hits:
         print("no page matches any word of the question", file=err)
         return 0
     for rank, hit in enumerate(hits, start=1):
-        _print_hit(rank, hit, out)
+        _print_hit(rank, hit, out, used)
     return 0
 
 
-def _search(args: argparse.Namespace, snapshot: Snapshot, err: TextIO) -> list[PageHit]:
-    """Search with the chosen retriever; fall back to keywords when vectors are missing."""
+def _search(args: argparse.Namespace, snapshot: Snapshot, err: TextIO) -> tuple[list[PageHit], str]:
+    """Search with the chosen retriever, falling back to keywords when vectors are
+    missing; return the hits and the retriever actually used."""
     if args.retriever != "bm25":
         if not snapshot.embedded.any():
-            print("no semantic index yet (Ollama was not running); using keyword search", file=err)
+            print(
+                "no usable semantic index (Ollama was not running when the folder was indexed,"
+                " or the embedding model changed); using keyword search",
+                file=err,
+            )
         else:
             try:
                 query = _embedder(args).embed_query(args.question)
-            except http.ProviderError as exc:
-                print(f"{shown(str(exc))}; using keyword search", file=err)
-            else:
                 if not snapshot.fully_embedded:
                     print("some chunks are not embedded yet; run index to finish", file=err)
                 if args.retriever == "dense":
-                    return search_dense(snapshot, query, args.k)
-                return search_hybrid(snapshot, args.question, query, args.k)
-    return search_bm25(snapshot, args.question, args.k)
+                    return search_dense(snapshot, query, args.k), "dense"
+                return search_hybrid(snapshot, args.question, query, args.k), "hybrid"
+            except http.ProviderError as exc:
+                print(f"{shown(str(exc))}; using keyword search", file=err)
+            except ValueError:  # the query vector's size does not match the index
+                print(
+                    "the embedding model changed since this folder was indexed; using keyword"
+                    f" search. Delete {_index_path(args)} and index again to fix it.",
+                    file=err,
+                )
+    return search_bm25(snapshot, args.question, args.k), "bm25"
 
 
 def _as_pipe_error(exc: OSError) -> OSError:
