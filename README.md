@@ -45,7 +45,8 @@ so a bad answer can be traced to where it went wrong:
 
 Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
 once per release. Questions from the Qasper dataset, written by people who had seen only
-a paper's title and abstract, will be reported next to the in-house set (not yet measured).
+a paper's title and abstract, were planned as an outside check but were cut to ship
+sooner; the limitations below say what that leaves.
 A CI job reruns every model-free number below, checks these tables against the results
 files, and fails if a number changes without them.
 
@@ -101,8 +102,8 @@ Follow-up questions (14 on dev, such as "What about at AAL3?"), searched three w
 were drafted by an AI model (Claude) working as the project's lead developer, and are
 being checked by hand by the author. The questions were written from askpdf's extracted
 text, so they lean towards passages the extractor reads well; self-written questions also
-favour lexical retrieval. Both are reasons the blind-written Qasper dataset questions will
-be reported next to them. (The in-house questions with ids `qasper-*` are about the paper
+favour lexical retrieval. Questions written blind by outsiders would offset both; that
+check is not part of this version. (The in-house questions with ids `qasper-*` are about the paper
 that introduced Qasper, one of the corpus documents; they are not from the dataset.) On the
 scanned report, evidence quotes follow its OCR layer, misreadings included, because they are
 checked against the text askpdf actually extracts. The corpus files and their licences are
@@ -112,7 +113,8 @@ listed in `eval/corpus/SOURCES.md`.
 
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.
-  Extractors are compared on hand-transcribed pages before v0.1.
+  On the 8 transcribed pages pypdfium2 ties with pypdf (character error rate 0.031) and
+  pdfplumber reads across two-column pages (0.260), so pypdf stays.
 - PDFs that need a password to open are skipped with the reason shown. PDFs that open
   with an empty password (RC4 or AES) are read, including ones marked "no copying" or "no
   printing": askpdf reads your own files locally and does not enforce those advisory
@@ -120,7 +122,7 @@ listed in `eval/corpus/SOURCES.md`.
 - A word broken across lines at a hyphen is rejoined without the hyphen only if the same
   document spells it solid more often than hyphenated; otherwise the hyphen stays. So
   "multi-factor" stays a compound, but a word broken by layout that the document uses only
-  once keeps a stray hyphen ("algo-rithm"). How often that happens is measured before v0.1.
+  once keeps a stray hyphen ("algo-rithm"). How often that happens is not measured.
   Header and footer lines are never joined to the text, but they are only recognised in
   documents of 4 pages or more; in a shorter one, a page number under a hyphenated last
   line can end up glued on ("multi-3").
