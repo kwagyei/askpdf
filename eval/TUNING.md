@@ -12,7 +12,7 @@ split, and the numbers. All tuning uses the dev split only (ADR-0004, ADR-0007).
 | Chunk size and overlap | defaults (`ChunkParams`) | Not tuned yet. |
 | Retriever | BM25 (default) | Dense and hybrid were not better on dev by the rule below; see "Retriever and RRF constant". |
 | RRF constant | 60 | 10 and 30 made no detectable difference. |
-| k (pages sent to the model) | 5 | Not tuned yet; chosen with the answering stage. |
+| k (pages sent to the model) | 3 | Latency against recall on dev; see "Pages given to the answer model". |
 | Follow-up questions | history joined (`concat`) | Dev: hit@1 0.500 vs 0.429 as typed (14 follow-ups; the intervals overlap). The model rewrite was cut in design revision 3. |
 
 ## Retriever and RRF constant (2026-10-27)
@@ -43,6 +43,31 @@ Dense retrieval does what it is for on paraphrased questions (nDCG@10 0.648 with
 0.673 dense, 0.696 hybrid) but loses on lexical and table questions, and over 49
 questions no difference is detectable. BM25 stays the default; `--retriever hybrid` is
 available. A larger dev set is what would change this.
+
+## Pages given to the answer model (2026-10-31)
+
+On the target Intel Mac, llama3.2:3b reads the prompt at about 33 tokens a second before
+it writes anything (Ollama's `prompt_eval_duration`: 1,942 tokens in 59 s for 3 NIST pages,
+then about 4.5 tokens a second while writing). Each page adds roughly 650 tokens, so
+k = 5 adds about 40 s of waiting to every answer over k = 3.
+
+What that costs in retrieval, BM25 on the 49 answerable dev questions
+(`eval/results/dev-retrieval-bm25.json`, `ranked`):
+
+| k | Gold page among the k pages |
+|---|---|
+| 1 | 29 (0.592) |
+| 3 | 39 (0.796) |
+| 5 | 43 (0.878) |
+
+k = 3 was chosen: 4 of 49 questions lose their gold page, in exchange for answers about a
+minute sooner. This is a judgement on speed, not a significance test; `ask -k 5` is
+available. The answer stage below is measured at k = 3.
+
+The prompt wording was changed once, after one ad-hoc question about NIST password length
+(not from either split):
+the first wording put `[n]` only in the Quotes section, never after sentences, so rule 1
+now asks for a number at the end of every sentence and the example shows two.
 
 ## Test-split exposure
 

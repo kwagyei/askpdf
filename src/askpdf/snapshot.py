@@ -34,6 +34,9 @@ class Snapshot:
     labels: Mapping[tuple[str, int], str]  # (sha256, page) -> printed page label
     paths: Mapping[str, tuple[str, ...]]  # sha256 -> the files holding that document
     bm25: BM25
+    # (sha256, page) -> the page's whole cleaned text: the context answers are written
+    # from, and what their quotes are checked against.
+    texts: Mapping[tuple[str, int], str] = field(default_factory=lambda: MappingProxyType({}))
     # One L2-normalised float32 row per chunk, in the same order; rows of chunks not
     # embedded yet are zero and marked False in ``embedded``.
     vectors: npt.NDArray[np.float32] = field(default_factory=lambda: np.zeros((0, 0), np.float32))
@@ -45,6 +48,7 @@ class Snapshot:
             generation = store.generation
             rows = store.all_chunks()
             labels = store.page_labels()
+            texts = store.page_texts()
             paths = store.indexed_paths()
             blobs = store.all_vectors()
         chunks = tuple(Chunk(*row) for row in rows)
@@ -55,6 +59,7 @@ class Snapshot:
             labels=MappingProxyType(labels),
             paths=MappingProxyType(paths),
             bm25=BM25.build(tokenize(c.text) for c in chunks),
+            texts=MappingProxyType(texts),
             vectors=vectors,
             embedded=embedded,
         )

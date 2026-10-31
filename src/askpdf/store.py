@@ -493,6 +493,13 @@ class Store:
             for sha, page, label in self._db.execute("SELECT sha256, page, label FROM pages")
         }
 
+    def page_texts(self) -> dict[tuple[str, int], str]:
+        """Each page's whole cleaned text, which quotes are checked against."""
+        return {
+            (sha, page): text
+            for sha, page, text in self._db.execute("SELECT sha256, page, text FROM pages")
+        }
+
     def indexed_paths(self) -> dict[str, tuple[str, ...]]:
         """The files of each document, sorted; a document has several if it was copied."""
         paths: dict[str, list[str]] = {}

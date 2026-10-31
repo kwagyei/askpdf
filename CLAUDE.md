@@ -17,6 +17,11 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
 - Models via Ollama's native API (llama3.2:3b, nomic-embed-text); optional BYOK chat only.
   `providers/http.py` is the only network code. Tests set `ASKPDF_OLLAMA_URL` to a closed
   port (conftest) and use `tests/fake_models.py`, a loopback server; never a real model.
+- `askpdf ask` validates every reply: `[n]` must be a page the model was given, and each
+  quote is checked by `quotes.py` (ADR-0006 Amendment 1 matching key). `askpdf eval
+  answers` needs Ollama and takes about 1.5 h on the Intel Mac; it keeps every raw reply,
+  so `eval/tools/rescore_answers.py` re-checks them after a validation change without
+  rerunning the model.
 - Dense/hybrid evaluation needs Ollama, so it runs locally (`eval/tools/tune_retrieval.py`)
   and stays out of the CI gate; results record the model digest and Ollama version.
 

@@ -84,15 +84,24 @@ class OllamaChat:
     url: str = DEFAULT_URL
     model: str = CHAT_MODEL
     num_ctx: int = 8192
+    max_tokens: int = 768  # an answer and its quotes; caps the time a runaway answer takes
+    # Before the first token the model reads the whole prompt: about 33 tokens/s on the
+    # target Intel Mac, so a long context takes minutes, not seconds.
+    timeout: float = 600.0
 
     def stream(self, system: str, user: str) -> Iterator[str]:
         payload = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "stream": True,
-            "options": {"temperature": 0, "seed": 0, "num_ctx": self.num_ctx},
+            "options": {
+                "temperature": 0,
+                "seed": 0,
+                "num_ctx": self.num_ctx,
+                "num_predict": self.max_tokens,
+            },
         }
-        for line in http.stream_lines(f"{self.url}/api/chat", payload):
+        for line in http.stream_lines(f"{self.url}/api/chat", payload, timeout=self.timeout):
             event = _json(line)
             if "error" in event:
                 raise http.ProviderError(f"Ollama: {event['error']}")
