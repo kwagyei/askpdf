@@ -8,9 +8,9 @@ page. It runs locally with [Ollama](https://ollama.com); nothing leaves your mac
 you opt in to a remote model.
 
 > **Work in progress.** The design is settled and the code arrives through pull requests.
-> What works today: reading a folder of PDFs into the local index and searching it by
-> keyword (BM25) or by meaning (embeddings from a local model). Answers and the web app
-> come next.
+> What works today, from the command line: reading a folder of PDFs into a local index,
+> searching it by keyword (BM25) or by meaning (embeddings from a local model), and
+> answering questions with checked citations. The web app comes next.
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -35,6 +35,28 @@ keyword, and askpdf says so. Re-running `index` only reads new or changed files 
 embeds chunks that have no vector yet; renamed and copied files are recognised by their
 content. The index lives in your cache folder, never in the folder you point it at.
 
+### Answers with checked quotes
+
+`askpdf ask FOLDER "question"` gives the 3 best pages to a local model (llama3.2:3b via
+Ollama by default) and asks for an answer that cites them as `[1]`, `[2]`, followed by a
+quote from each cited page, or `NOT_FOUND` if the pages do not say. askpdf then checks the
+reply instead of trusting it:
+
+- A citation must name one of the pages the model was given; any other number is removed.
+  File names and page numbers are always taken from the index, never from the model's text.
+- Each quote must appear on the cited page. "Appear" means a plain substring match after
+  ignoring case, the style of quote marks and dashes, runs of whitespace, and a hyphen
+  between two letters (so `multi-factor` matches `multifactor`). A hyphen next to a digit
+  counts (`SP 800-63B` is not `SP 80063B`), and nothing else is forgiven: a changed letter,
+  a dropped word or an added "not" fails. Quotes under 5 words are not accepted.
+- Every source is printed with a ✓ or the reason its quote failed. An answer with no
+  verified quote is flagged as ungrounded, and `ask` exits with status 3.
+
+A verified quote proves that these words are on that page, not that they support the
+sentence they are attached to.
+
+<!-- sample:ask -->
+
 ## What makes it different
 
 The interesting part is not the chatbot but the measurement. Each stage is scored on its own,
@@ -44,8 +66,8 @@ so a bad answer can be traced to where it went wrong:
 | --- | --- | --- |
 | Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
 | Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25, dense and hybrid measured |
-| Grounding | Does the cited page actually contain the quote? | planned |
-| Abstention | Does it say "not found" instead of guessing? | planned |
+| Grounding | Does the cited page actually contain the quote? | measured on dev (local model) |
+| Abstention | Does it say "not found" instead of guessing? | measured on dev (local model) |
 | Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
 | Latency | How long does it take on an 8 GB laptop without a GPU? | planned |
 
@@ -116,6 +138,15 @@ checked against the text askpdf actually extracts. The corpus files and their li
 listed in `eval/corpus/SOURCES.md`.
 
 ## Known limitations (so far)
+
+- Answers are slow on a laptop without a GPU. On the Intel Mac this was built on, the 3B
+  model reads the 3 pages for about a minute before it writes, and a whole answer takes
+  around a minute and a half. Fewer pages are sent for that reason, so a few answers miss
+  their page (see `eval/TUNING.md`).
+- Whether an answer is *correct* is not measured yet; the checks above show that quoted
+  words are on the cited page, not that the answer is right. People label a sample of
+  answers at release.
+- The answer model sees only the question and the retrieved pages, not earlier turns.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
   2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about

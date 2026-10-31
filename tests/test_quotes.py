@@ -138,3 +138,14 @@ def test_any_hyphen_spelling_of_a_page_has_the_same_key(
     joins = [data.draw(st.sampled_from(["", "-", "- ", "\u2010", "-\n"])) for _ in words[1:]]
     spelled = words[0] + "".join(j + w for j, w in zip(joins, words[1:], strict=True))
     assert match_key(spelled) == match_key("".join(words))
+
+
+def test_a_quote_may_start_at_the_second_half_of_a_compound() -> None:
+    result = check("factor authentication for all accounts", PAGE)
+    assert result.verified and not result.needed_folding
+
+
+def test_word_boundaries_hold_after_folding() -> None:
+    page = "Use a multi-factor authenticator here."
+    assert check("use a multifactor authenticator here", page).verified
+    assert not check("use a multifactor authenticat", page).verified

@@ -331,3 +331,9 @@ def test_show_context_prints_the_pages_given_to_the_model(
         models.chat_reply = [NOT_FOUND]
         assert main([*_ask(folder), "--show-context"]) == 0
     assert "[1] policy.pdf, page 1\nPasswords need" in capsys.readouterr().err
+
+
+def test_the_last_quotes_heading_with_quote_lines_is_taken() -> None:
+    raw = 'Quote\nFifteen characters [1].\nQuotes:\n[1] "be at least fifteen characters long"'
+    result = parse(raw, HITS, TEXTS)
+    assert result.text == "Quote\nFifteen characters [1]." and result.grounded

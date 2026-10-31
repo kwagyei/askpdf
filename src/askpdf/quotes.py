@@ -11,7 +11,9 @@ the whole stored text of the cited page. ``M`` only removes differences of style
    ``multi-factor``, ``multi- factor`` and ``multifactor`` match; next to a digit the
    hyphen stays, so ``SP 800-63B`` never matches ``SP 80063B``
 
-No fuzzy matching: a changed letter, a dropped word or an inserted "not" is unverified.
+The match must start and end on word boundaries, so "safe to use" is not found inside
+"unsafe to use". No fuzzy matching: a changed letter, a dropped word or an inserted
+"not" is unverified.
 The page side is the stored, already-cleaned text and is never cleaned again; the quote
 side gets only the cleaning steps that do not depend on the document.
 """
@@ -22,6 +24,8 @@ from dataclasses import dataclass
 from askpdf.extract.clean import clean_page
 
 MIN_WORDS = 5  # a shorter quote proves little ("in the United States")
+_WORD = re.compile(r"\w")  # a word has a letter or digit; "- - - - -" has no words
+_LETTERS = re.compile(r"[^\W\d_]")
 
 
 def _chars(*codes: int) -> str:
@@ -80,13 +84,37 @@ class PageKeys:
 def check(quote: str, page_text: str, keys: tuple[str, str] | None = None) -> QuoteCheck:
     """Is ``quote`` on the page whose stored text is ``page_text``?"""
     cleaned = clean_quote(quote)
-    if len(cleaned.split()) < MIN_WORDS:
+    words = [w for w in cleaned.split() if _WORD.search(w)]
+    if len(words) < MIN_WORDS or not _LETTERS.search(cleaned):
         return QuoteCheck(quote, False, reason=f"shorter than {MIN_WORDS} words")
     folded_page, plain_page = keys or (
         match_key(page_text),
         match_key(page_text, fold_hyphens=False),
     )
-    if match_key(cleaned) not in folded_page:
-        return QuoteCheck(quote, False, reason="not found on the page")
-    plain = match_key(cleaned, fold_hyphens=False) in plain_page
-    return QuoteCheck(quote, True, needed_folding=not plain)
+    # Without folding first: a quote may start at the second half of a hyphenated
+    # compound ("factor authentication" on a page saying "multi-factor authentication"),
+    # which the folded key would see as starting inside the word "multifactor".
+    if _contains(plain_page, match_key(cleaned, fold_hyphens=False)):
+        return QuoteCheck(quote, True)
+    if _contains(folded_page, match_key(cleaned)):
+        return QuoteCheck(quote, True, needed_folding=True)
+    return QuoteCheck(quote, False, reason="not found on the page")
+
+
+def _contains(page: str, quote: str) -> bool:
+    """Substring containment on word boundaries: "safe to use" is not inside "unsafe to
+    use", and a quote cannot stop halfway through a word."""
+    start = page.find(quote)
+    while start != -1:
+        end = start + len(quote)
+        before = page[start - 1] if start else " "
+        after = page[end] if end < len(page) else " "
+        if not (_joins(before, quote[0]) or _joins(quote[-1], after)):
+            return True
+        start = page.find(quote, start + 1)
+    return False
+
+
+def _joins(left: str, right: str) -> bool:
+    """Would these two characters be read as one word?"""
+    return bool(_WORD.match(left) and _WORD.match(right))

@@ -138,7 +138,13 @@ def answer(
 # "Quotes:" on its own line (or starting one), tolerating Markdown such as "**Quotes:**".
 _HEADING = re.compile(r"^[ \t*#_>]*quotes?[ \t*_]*(?::[ \t*_]*|$)", re.I | re.M)
 _MARKER = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
-_QUOTE_LINE = re.compile(r"^[\W_]*?\[(\d+)\]\s*[:\-\u2013\u2014]?\s*(.+?)\s*$")
+# No backtracking between whitespace and text: the rest of the line is taken whole and
+# stripped, so a long run of spaces costs linear time.
+_QUOTE_LINE = re.compile(r"^[\W_]*?\[(\d+)\]\s*[:\-\u2013\u2014]?(.*)", re.M)
+_INLINE_QUOTE = re.compile(r"[^\S\n]*\[\d+\]")  # "Quotes: [1] ..." on one line
+# A context has a handful of pages; a longer number is never valid, and converting
+# thousands of digits with int() raises ValueError.
+_MAX_DIGITS = 4
 _WRAPPING = "\"'" + "".join(map(chr, (0x201C, 0x201D, 0x2018, 0x2019, 0xAB, 0xBB)))
 _SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
 _LETTER = re.compile(r"[^\W\d_]")
@@ -149,11 +155,24 @@ def _not_found(raw: str) -> bool:
     return re.fullmatch(rf"[\W_]*{NOT_FOUND}[\W_]*", first.strip()) is not None
 
 
+def _number(text: str) -> int:
+    """The marker's number; -1 (never a valid page) when it is absurdly long."""
+    text = text.strip()
+    return int(text) if len(text) <= _MAX_DIGITS else -1
+
+
 def _split(raw: str) -> tuple[str, str]:
-    heading = _HEADING.search(raw)
-    if heading is None:
-        return raw.strip(), ""
-    return raw[: heading.start()].strip(), raw[heading.end() :]
+    """The answer and its Quotes section. The heading taken is the last one followed by a
+    quote line, so a stray "Quote" line elsewhere cannot swallow the answer."""
+    headings = list(_HEADING.finditer(raw))
+    # Where quote lines start: at line starts, or right after an inline "Quotes:".
+    lines = [m.start() for m in re.finditer(r"^", raw, re.M) if _QUOTE_LINE.match(raw, m.start())]
+    inline = [h.end() for h in headings if _INLINE_QUOTE.match(raw, h.end())]
+    last = max(lines + inline, default=-1)
+    for heading in reversed(headings):
+        if heading.end() <= last:
+            return raw[: heading.start()].strip(), raw[heading.end() :]
+    return raw.strip(), ""
 
 
 def _quotes(section: str) -> dict[int, list[str]]:
@@ -163,9 +182,9 @@ def _quotes(section: str) -> dict[int, list[str]]:
         if match is None:
             continue
         # Quote marks, and punctuation at either end, are not part of the quoted words.
-        text = match.group(2).strip(_WRAPPING + ".,;:\u2026 \t")
+        text = match.group(2).strip().strip(_WRAPPING + ".,;:\u2026 \t")
         if text:
-            found.setdefault(int(match.group(1)), []).append(text)
+            found.setdefault(_number(match.group(1)), []).append(text)
     return found
 
 
@@ -179,9 +198,10 @@ def parse(raw: str, hits: Sequence[PageHit], texts: Mapping[tuple[str, int], str
     def renumber(match: re.Match[str]) -> str:
         kept = []
         for part in match.group(1).split(","):
-            n = int(part)
+            n = _number(part)
             if n not in valid:
-                dropped.append(n)
+                if n >= 0:  # an absurdly long number is removed without being reported
+                    dropped.append(n)
                 continue
             order.setdefault(n, len(order) + 1)
             if order[n] not in kept:
@@ -208,7 +228,7 @@ def parse(raw: str, hits: Sequence[PageHit], texts: Mapping[tuple[str, int], str
     supported = sum(
         1
         for s in sentences
-        if any(int(n) in verified for m in _MARKER.finditer(s) for n in m.group(1).split(","))
+        if any(_number(n) in verified for m in _MARKER.finditer(s) for n in m.group(1).split(","))
     )
     return Answer(
         text=text,
