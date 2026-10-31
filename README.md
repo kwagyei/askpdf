@@ -9,7 +9,8 @@ you opt in to a remote model.
 
 > **Work in progress.** The design is settled and the code arrives through pull requests.
 > What works today: reading a folder of PDFs into the local index and searching it by
-> keyword (BM25). Answers and the web app come next.
+> keyword (BM25) or by meaning (embeddings from a local model). Answers and the web app
+> come next.
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -25,9 +26,14 @@ $ askpdf search ~/Documents/papers "phishing-resistant authenticators" -k 2
 ```
 
 `search` ranks pages by BM25 over their chunks, needs no model, and treats `multi-factor`
-and `multi factor` as the same words. Re-running `index` only reads new or changed files;
-renamed and copied files are recognised by their content and not read again. The index lives in your cache folder, never in the
-folder you point it at.
+and `multi factor` as the same words. With [Ollama](https://ollama.com) running and
+`nomic-embed-text` pulled, `index` also embeds every chunk, and `search --retriever dense`
+or `--retriever hybrid` (reciprocal rank fusion of both) finds pages by meaning. Keyword
+search stays the default because on the development questions neither alternative was
+measurably better (see `eval/TUNING.md`). Without Ollama everything still works by
+keyword, and askpdf says so. Re-running `index` only reads new or changed files and only
+embeds chunks that have no vector yet; renamed and copied files are recognised by their
+content. The index lives in your cache folder, never in the folder you point it at.
 
 ## What makes it different
 
@@ -37,7 +43,7 @@ so a bad answer can be traced to where it went wrong:
 | Stage | Question it answers | Status |
 | --- | --- | --- |
 | Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
-| Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25 measured |
+| Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25, dense and hybrid measured |
 | Grounding | Does the cited page actually contain the quote? | planned |
 | Abstention | Does it say "not found" instead of guessing? | planned |
 | Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
@@ -111,6 +117,9 @@ listed in `eval/corpus/SOURCES.md`.
 
 ## Known limitations (so far)
 
+- Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
+  2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about
+  three minutes the first time. Later runs only embed what changed.
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.
   On the 8 transcribed pages pypdfium2 ties with pypdf (character error rate 0.031) and

@@ -187,7 +187,9 @@ def test_ten_thousand_chunks_load_and_search_quickly(tmp_path: Path) -> None:
         hits = search_bm25(snap, "term1 term20 term300", k=10)
         query = time.perf_counter() - start
     assert len(hits) == 10
-    assert load < 10 and query < 0.5
+    # Loose bounds: they catch an accidental quadratic step, not normal noise, and must
+    # hold with every core busy under `pytest -n auto`.
+    assert load < 30 and query < 2
 
 
 # --- CLI ----------------------------------------------------------------------------------

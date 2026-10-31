@@ -23,8 +23,20 @@ from typing import Any, TextIO, cast
 from askpdf import __version__
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
-from askpdf.indexer import build_records, index_folder, pins
-from askpdf.retrieve import DEFAULT_K, PageHit, search_bm25
+from askpdf.indexer import build_records, embed_missing, index_folder, pins
+from askpdf.providers import http, ollama
+from askpdf.providers.ollama import OllamaEmbedder
+from askpdf.providers.openai_compat import allow_remote
+from askpdf.retrieve import (
+    DEFAULT_K,
+    DEFAULT_RETRIEVER,
+    RETRIEVERS,
+    RRF_K,
+    PageHit,
+    search_bm25,
+    search_dense,
+    search_hybrid,
+)
 from askpdf.snapshot import Snapshot
 from askpdf.store import (
     NotAnIndexError,
@@ -47,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     def with_target(sub: argparse.ArgumentParser) -> None:
         sub.add_argument("path", type=Path, metavar="FOLDER_OR_PDF")
         sub.add_argument(
+            "--allow-remote",
+            action="store_true",
+            help="allow a model endpoint that is not this machine (it receives excerpts)",
+        )
+        sub.add_argument(
             "--index",
             type=Path,
             metavar="PATH",
@@ -63,9 +80,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search.add_argument(
         "--retriever",
-        choices=["bm25"],
-        default="bm25",
-        help="ranking method (dense and hybrid come with the model providers)",
+        choices=list(RETRIEVERS),
+        default=DEFAULT_RETRIEVER,
+        help=f"ranking method (default: {DEFAULT_RETRIEVER}; dense and hybrid need Ollama)",
     )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
     evaluate.add_argument("stage", choices=["extraction", "retrieval", "conversation"])
@@ -86,6 +103,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="the evaluation data (default: ./eval, as in the repository)",
     )
     evaluate.add_argument("--json", type=Path, metavar="PATH", help="also write the results here")
+    evaluate.add_argument(
+        "--retriever",
+        choices=list(RETRIEVERS),
+        default="bm25",
+        help="for retrieval (default: bm25)",
+    )
+    evaluate.add_argument(
+        "--rrf-k", type=_positive, default=RRF_K, metavar="N", help="RRF constant for hybrid"
+    )
+    evaluate.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -158,6 +185,7 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             if "locked" in str(exc) or "busy" in str(exc):
                 return _error(err, "the index is busy (another askpdf is indexing)")
             return _error(err, f"index error: {exc}")
+        embedded = _embed(args, store, err)
     if report.rebuilt:
         print("settings changed since the last run: rebuilt the index", file=err)
     for rel, reason in sorted(report.failed.items()):
@@ -175,9 +203,44 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         f"{report.unchanged} unchanged",
         f"{len(report.failed)} failed",
     ]
+    if embedded is not None:
+        parts.append(f"{embedded} chunks embedded")
     print(", ".join(parts), file=out)
     print(f"index: {store.path}", file=err)
     return 0
+
+
+def _embedder(args: argparse.Namespace) -> OllamaEmbedder:
+    url = ollama.base_url()
+    http.require_local_or_allowed(url, allow_remote(args.allow_remote))
+    return OllamaEmbedder(url)
+
+
+def _embed(args: argparse.Namespace, store: Store, err: TextIO) -> int | None:
+    """Embed the chunks that have no vector yet; None if that was not possible."""
+    try:
+        report = embed_missing(
+            store,
+            _embedder(args),
+            on_batch=lambda done, total: print(f"embedding {done}/{total} chunks", file=err),
+        )
+    except http.UnreachableError as exc:
+        print(
+            f"semantic search unavailable ({shown(str(exc))}); indexed for keyword search."
+            " Start Ollama (ollama serve) and run index again to add it.",
+            file=err,
+        )
+        return None
+    except http.ProviderError as exc:
+        print(f"semantic search unavailable: {shown(str(exc))}", file=err)
+        return None
+    if report.refused:
+        print(
+            f"{_plural(len(report.refused), 'chunk')} could not be embedded (the model refused"
+            " them, e.g. too long); they are found by keyword search only",
+            file=err,
+        )
+    return report.embedded
 
 
 def cmd_docs(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
@@ -278,12 +341,37 @@ def _eval_retrieval(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     path = args.eval_dir / "questions" / f"{args.split}.jsonl"
     if not path.is_file():
         raise ValueError(f"no question set at {path}")
-    snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
-    result = retrieval.evaluate(questions.load(path), retrieval.bm25_retriever(snapshot))
-    summary = {"stage": "retrieval", "split": args.split, "retriever": "bm25", **result}
+    corpus = args.eval_dir / "corpus"
+    provenance: dict[str, Any] = {}
+    if args.retriever == "bm25":
+        retriever = retrieval.bm25_retriever(retrieval.load_corpus_snapshot(corpus))
+    else:
+        # Needs Ollama, so it runs locally, never in the CI gate (design §16).
+        try:
+            embedder = _embedder(args)
+            provenance = {"embedder": embedder.name, **ollama.server_info(embedder.url)}
+            snapshot = retrieval.load_embedded_snapshot(
+                corpus, embedder, default_index_path(corpus)
+            )
+        except http.ProviderError as exc:
+            raise ValueError(f"{exc}; dense and hybrid evaluation need Ollama running") from exc
+        queries = retrieval.QueryCache(embedder)
+        retriever = retrieval.model_retriever(snapshot, queries, args.retriever, args.rrf_k)
+        if args.retriever == "hybrid":
+            provenance["rrf_k"] = args.rrf_k
+    result = retrieval.evaluate(questions.load(path), retriever)
+    summary = {
+        "stage": "retrieval",
+        "split": args.split,
+        "retriever": args.retriever,
+        **provenance,
+        **result,
+    }
     if args.release:
         summary["release"] = args.release
-    print(f"BM25 on {args.split}, {result['n_questions']} answerable questions", file=out)
+    label = {"bm25": "BM25", "dense": "Dense", "hybrid": f"Hybrid (RRF {args.rrf_k})"}
+    n = result["n_questions"]
+    print(f"{label[args.retriever]} on {args.split}, {n} answerable questions", file=out)
     print("  " + "  ".join(f"{m} {v:.3f}" for m, v in result["overall"].items()), file=out)
     for field in ("by_kind", "by_doc"):
         for name, scores in result[field].items():
@@ -357,10 +445,15 @@ def _snippet(text: str) -> str:
     return flat if len(flat) <= SNIPPET_CHARS else flat[: SNIPPET_CHARS - 1].rstrip() + "…"
 
 
-def _print_hit(rank: int, hit: PageHit, out: TextIO) -> None:
+# The three retrievers score on different scales, so the number says which one it is.
+SCORE_NAMES = {"bm25": "score", "dense": "cosine", "hybrid": "rrf"}
+
+
+def _print_hit(rank: int, hit: PageHit, out: TextIO, retriever: str = "bm25") -> None:
     name = shown(hit.paths[0]) if hit.paths else hit.sha256[:12]
     where = page_ref(hit.page, shown(hit.label))
-    print(f"{rank}. {name}  {where}  score {hit.score:.2f}", file=out)
+    digits = 4 if retriever == "hybrid" else 2  # RRF scores are around 1/60
+    print(f"{rank}. {name}  {where}  {SCORE_NAMES[retriever]} {hit.score:.{digits}f}", file=out)
     print(f"   {shown(_snippet(hit.best_chunk.text))}", file=out)
 
 
@@ -383,13 +476,42 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
                 f" run: askpdf index {args.path}",
             )
         snapshot = Snapshot.load(store)
-    hits = search_bm25(snapshot, args.question, args.k)
+    hits, used = _search(args, snapshot, err)
     if not hits:
         print("no page matches any word of the question", file=err)
         return 0
     for rank, hit in enumerate(hits, start=1):
-        _print_hit(rank, hit, out)
+        _print_hit(rank, hit, out, used)
     return 0
+
+
+def _search(args: argparse.Namespace, snapshot: Snapshot, err: TextIO) -> tuple[list[PageHit], str]:
+    """Search with the chosen retriever, falling back to keywords when vectors are
+    missing; return the hits and the retriever actually used."""
+    if args.retriever != "bm25":
+        if not snapshot.embedded.any():
+            print(
+                "no usable semantic index (Ollama was not running when the folder was indexed,"
+                " or the embedding model changed); using keyword search",
+                file=err,
+            )
+        else:
+            try:
+                query = _embedder(args).embed_query(args.question)
+                if not snapshot.fully_embedded:
+                    print("some chunks are not embedded yet; run index to finish", file=err)
+                if args.retriever == "dense":
+                    return search_dense(snapshot, query, args.k), "dense"
+                return search_hybrid(snapshot, args.question, query, args.k), "hybrid"
+            except http.ProviderError as exc:
+                print(f"{shown(str(exc))}; using keyword search", file=err)
+            except ValueError:  # the query vector's size does not match the index
+                print(
+                    "the embedding model changed since this folder was indexed; using keyword"
+                    f" search. Delete {_index_path(args)} and index again to fix it.",
+                    file=err,
+                )
+    return search_bm25(snapshot, args.question, args.k), "bm25"
 
 
 def _as_pipe_error(exc: OSError) -> OSError:

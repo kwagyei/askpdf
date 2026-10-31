@@ -1,0 +1,120 @@
+{
+  "split": "dev",
+  "metric": "ndcg@10",
+  "n_questions": 49,
+  "embedder": "ollama/nomic-embed-text",
+  "ollama_version": "0.40.5",
+  "model_digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+  "means": {
+    "bm25": {
+      "hit@1": 0.591837,
+      "hit@3": 0.795918,
+      "hit@5": 0.877551,
+      "recall@5": 0.867347,
+      "recall@10": 0.938776,
+      "mrr@10": 0.712245,
+      "ndcg@10": 0.767617
+    },
+    "dense": {
+      "hit@1": 0.571429,
+      "hit@3": 0.77551,
+      "hit@5": 0.857143,
+      "recall@5": 0.857143,
+      "recall@10": 0.897959,
+      "mrr@10": 0.682653,
+      "ndcg@10": 0.734185
+    },
+    "hybrid-10": {
+      "hit@1": 0.571429,
+      "hit@3": 0.857143,
+      "hit@5": 0.897959,
+      "recall@5": 0.897959,
+      "recall@10": 0.918367,
+      "mrr@10": 0.723469,
+      "ndcg@10": 0.774681
+    },
+    "hybrid-30": {
+      "hit@1": 0.571429,
+      "hit@3": 0.857143,
+      "hit@5": 0.897959,
+      "recall@5": 0.897959,
+      "recall@10": 0.897959,
+      "mrr@10": 0.720068,
+      "ndcg@10": 0.771193
+    },
+    "hybrid-60": {
+      "hit@1": 0.571429,
+      "hit@3": 0.857143,
+      "hit@5": 0.897959,
+      "recall@5": 0.897959,
+      "recall@10": 0.897959,
+      "mrr@10": 0.720068,
+      "ndcg@10": 0.771193
+    }
+  },
+  "intervals": {
+    "bm25": [
+      0.68023,
+      0.850226
+    ],
+    "dense": [
+      0.63644,
+      0.823146
+    ],
+    "hybrid-10": [
+      0.686653,
+      0.855223
+    ],
+    "hybrid-30": [
+      0.677431,
+      0.856029
+    ],
+    "hybrid-60": [
+      0.677431,
+      0.856029
+    ]
+  },
+  "comparisons": {
+    "hybrid-10 vs hybrid-60": {
+      "difference": 0.003488,
+      "interval_95": [
+        -0.018845,
+        0.025559
+      ],
+      "p_value": 1.0,
+      "adopt": false
+    },
+    "hybrid-30 vs hybrid-60": {
+      "difference": 0.0,
+      "interval_95": [
+        0.0,
+        0.0
+      ],
+      "p_value": 1.0,
+      "adopt": false
+    },
+    "dense vs bm25": {
+      "difference": -0.033432,
+      "interval_95": [
+        -0.120912,
+        0.053205
+      ],
+      "p_value": 0.464254,
+      "adopt": false
+    },
+    "hybrid-60 vs bm25": {
+      "difference": 0.003576,
+      "interval_95": [
+        -0.06496,
+        0.066429
+      ],
+      "p_value": 0.916608,
+      "adopt": false
+    }
+  },
+  "comparisons_made": 4,
+  "chosen": {
+    "retriever": "bm25",
+    "rrf_k": 60
+  }
+}

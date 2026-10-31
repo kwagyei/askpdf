@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: chunk ids are never reused
 
 _SCHEMA = """
 CREATE TABLE meta (
@@ -50,7 +50,9 @@ CREATE TABLE pages (
     PRIMARY KEY (sha256, page)
 );
 CREATE TABLE chunks (
-    id         INTEGER PRIMARY KEY,
+    -- AUTOINCREMENT: an id is never reused, so a vector computed for a chunk that was
+    -- deleted meanwhile can never land on a new chunk.
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
     sha256     TEXT NOT NULL,
     page       INTEGER NOT NULL,
     ordinal    INTEGER NOT NULL,
@@ -499,3 +501,33 @@ class Store:
         ):
             paths.setdefault(sha256, []).append(path)
         return {sha: tuple(p) for sha, p in paths.items()}
+
+    # --- vectors -------------------------------------------------------------------
+
+    def chunks_without_vectors(self) -> list[tuple[int, str]]:
+        """``(id, text)`` of every chunk not embedded yet, in id order."""
+        return self._db.execute(
+            "SELECT c.id, c.text FROM chunks c LEFT JOIN vectors v ON v.chunk_id = c.id"
+            " WHERE v.chunk_id IS NULL ORDER BY c.id"
+        ).fetchall()
+
+    def put_vectors(self, rows: Sequence[tuple[int, bytes]]) -> None:
+        """Store float32 vectors for chunks, in one transaction; readers rebuild after it."""
+        if not rows:
+            return
+        with self.transaction():
+            # A chunk deleted since it was read has no row to refer to; skip it.
+            self._db.executemany(
+                "INSERT OR REPLACE INTO vectors (chunk_id, vector)"
+                " SELECT ?, ? WHERE EXISTS (SELECT 1 FROM chunks WHERE id = ?)",
+                [(cid, blob, cid) for cid, blob in rows],
+            )
+            self._bump_generation()
+
+    def vector_dim(self) -> int | None:
+        """The length of the stored vectors, or None if there are none yet."""
+        row = self._db.execute("SELECT length(vector) FROM vectors LIMIT 1").fetchone()
+        return None if row is None else int(row[0]) // 4
+
+    def all_vectors(self) -> dict[int, bytes]:
+        return dict(self._db.execute("SELECT chunk_id, vector FROM vectors").fetchall())

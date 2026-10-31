@@ -14,7 +14,11 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
   `cryptography` has no Intel-Mac wheels). Everything else is stdlib.
 - Dependency groups (pip >= 25.1): `dev` (pytest, pytest-xdist, hypothesis, ruff, mypy, httpx,
   pytrec-eval-terrier) and `eval` (jiwer, pdfplumber, pypdfium2, rapidfuzz)
-- Models via Ollama's native API (llama3.2:3b, nomic-embed-text); optional BYOK chat only
+- Models via Ollama's native API (llama3.2:3b, nomic-embed-text); optional BYOK chat only.
+  `providers/http.py` is the only network code. Tests set `ASKPDF_OLLAMA_URL` to a closed
+  port (conftest) and use `tests/fake_models.py`, a loopback server; never a real model.
+- Dense/hybrid evaluation needs Ollama, so it runs locally (`eval/tools/tune_retrieval.py`)
+  and stays out of the CI gate; results record the model digest and Ollama version.
 
 ## Commands
 
