@@ -55,7 +55,27 @@ reply instead of trusting it:
 A verified quote proves that these words are on that page, not that they support the
 sentence they are attached to.
 
-<!-- sample:ask -->
+A real run on the development Mac (Intel, CPU only); two long quotes are shortened where marked …:
+
+```text
+$ askpdf ask ~/Documents/papers "Which Unicode normalization form should be applied to passwords before hashing?"
+answering from 3 pages…
+The Unicode normalization form that should be applied to passwords before hashing is NFC normalization defined in Sec. 12.1 of Unicode Normalization Forms [UAX15].
+
+Sources:
+[1] nist-sp-800-63b-4.pdf  p. 15 (PDF page 26)
+    ✓ “This process is applied before hashing the byte string that represents the password”
+[2] nist-sp-800-63b-4.pdf  p. 16 (PDF page 27)
+    the quoted words are on nist-sp-800-63b-4.pdf p. 15 (PDF page 26); the answer numbered its source wrongly
+    ✗ not found on the page: “Subscribers choosing passwords that contain Unicode characters SHOULD be advised …”
+[3] nist-sp-800-63b-4.pdf  p. 87 (PDF page 98)
+    the quoted words are on nist-sp-800-63b-4.pdf p. 15 (PDF page 26); the answer numbered its source wrongly
+    ✗ not found on the page: “The entire password SHALL be subject to comparison, not substrings or words …”
+```
+
+The answer is right (page 26 names NFC), but only one of its three quotes checks out: the
+other two are real sentences from page 26, filed under the wrong number. That is typical
+of the 3B model, and the results below count it.
 
 ## What makes it different
 
@@ -125,6 +145,33 @@ Follow-up questions (14 on dev, such as "What about at AAL3?"), searched three w
 | hand-written rewrite | 0.857 (0.64 to 1.00) | 0.933 |
 <!-- /results -->
 
+### Answers (development split, local model)
+
+These need Ollama, so they are run by hand on the development Mac (Intel, no GPU) and
+committed, not rerun in CI. Every reply is kept in `eval/results/dev-answers.json`.
+
+<!-- results:answers -->
+Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each:
+
+| Measure | Result |
+| --- | --- |
+| Citations whose quote is on the cited page | 11 of 59 (0.186) |
+| of those, verified only by folding hyphens | 0.000 |
+| Answer sentences carrying a verified citation | 0.159 |
+| Answers with at least one verified citation | 0.224 of 49 (95% interval 0.12 to 0.35) |
+| Unanswerable questions answered anyway | 3 of 9 |
+| NOT_FOUND precision / recall | 1.000 / 0.667 |
+| Answerable questions answered NOT_FOUND | 0 of 49 |
+| Median time per answer | 63 s |
+<!-- /results -->
+
+The small local model rarely answers in the checkable form: of the citations that failed, 13 quoted the right words under the number of another page
+it was given, and 20 had no quote because the model copied the page's wording into the
+answer sentence instead. So the grounding rate here says more about a 3B model following
+a format than about whether its answers are true; a larger model, or a remote one with
+`--api-url`, is the obvious thing to try. Unanswerable questions are where it helps most:
+it said "not found" for 6 of 9 and never for an answerable one.
+
 **Who wrote the evaluation data.** The questions, conversations and page transcriptions
 were drafted by an AI model (Claude) working as the project's lead developer, and are
 being checked by hand by the author. The questions were written from askpdf's extracted
@@ -140,8 +187,8 @@ listed in `eval/corpus/SOURCES.md`.
 ## Known limitations (so far)
 
 - Answers are slow on a laptop without a GPU. On the Intel Mac this was built on, the 3B
-  model reads the 3 pages for about a minute before it writes, and a whole answer takes
-  around a minute and a half. Fewer pages are sent for that reason, so a few answers miss
+  model reads the 3 pages for most of a minute before it writes; the median answer on the
+  development questions took 63 seconds. Fewer pages are sent for that reason, so a few answers miss
   their page (see `eval/TUNING.md`).
 - Whether an answer is *correct* is not measured yet; the checks above show that quoted
   words are on the cited page, not that the answer is right. People label a sample of

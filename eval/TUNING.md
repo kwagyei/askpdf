@@ -83,7 +83,24 @@ page), so the fix belongs in the prompt:
   `=== End of page [n] ===`. On the same 4 questions, 1 became verified and 1 more cited
   the right page with a paraphrased quote.
 
-A full rerun with both changes is the one recorded in `eval/results/dev-answers.json`.
+The full rerun with both changes is the one recorded in `eval/results/dev-answers.json`:
+
+| Dev, 58 questions | First prompt | Fenced blocks (kept) |
+|---|---|---|
+| Citations whose quote is on the cited page | 12 of 52 (0.231) | 11 of 59 (0.186) |
+| Answers with a verified citation | 12 of 48 (0.250) | 11 of 49 (0.224) |
+| Unverified: words on another given page | 22 | 13 |
+| Unverified: no quote given | 11 | 20 |
+| Unanswerable questions answered anyway | 5 of 9 | 3 of 9 |
+| NOT_FOUND precision | 0.800 | 1.000 |
+
+Misnumbering fell, but the model now more often leaves out the Quotes section and copies
+the page's words into the answer sentence instead. Grounding did not change detectably
+(the per-answer intervals overlap widely). The fenced prompt is kept for its abstention
+and because a misnumbered citation is the worse failure; prompt tuning stops here, as
+each full run takes about 75 minutes. Checking the cited sentence itself when no quote is
+given would count many of the 20 copied sentences, but it changes ADR-0006, so it is left
+to the architect.
 A quote that is on another given page is now reported as such (`quote_on`), both in
 `ask` and as `unverified_misnumbered` in the results, but it still does not verify.
 
