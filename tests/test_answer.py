@@ -57,9 +57,10 @@ class ScriptedChat:
 
 def test_the_prompt_numbers_one_block_per_page_with_index_names() -> None:
     prompt = build_prompt("How long?", HITS, TEXTS)
-    assert "[1] a.pdf, page 3 (printed iii)\nPasswords SHALL" in prompt
-    assert "[2] a.pdf, page 7\nAccounts" in prompt  # no "printed" when it is the same
-    assert "[3] wing.pdf, page 1\n" in prompt  # the file name, not its folders
+    assert "=== Page [1]: a.pdf, page 3 (printed iii) ===\nPasswords SHALL" in prompt
+    assert "long for single-factor use.\n=== End of page [1] ===" in prompt
+    assert "=== Page [2]: a.pdf, page 7 ===\nAccounts" in prompt  # same label: not repeated
+    assert "=== Page [3]: wing.pdf, page 1 ===\n" in prompt  # the file name, not its folders
     assert prompt.endswith("Question: How long?")
 
 
@@ -330,10 +331,37 @@ def test_show_context_prints_the_pages_given_to_the_model(
         monkeypatch.setenv("ASKPDF_OLLAMA_URL", url)
         models.chat_reply = [NOT_FOUND]
         assert main([*_ask(folder), "--show-context"]) == 0
-    assert "[1] policy.pdf, page 1\nPasswords need" in capsys.readouterr().err
+    assert "=== Page [1]: policy.pdf, page 1 ===\nPasswords need" in capsys.readouterr().err
 
 
 def test_the_last_quotes_heading_with_quote_lines_is_taken() -> None:
     raw = 'Quote\nFifteen characters [1].\nQuotes:\n[1] "be at least fifteen characters long"'
     result = parse(raw, HITS, TEXTS)
     assert result.text == "Quote\nFifteen characters [1]." and result.grounded
+
+
+def test_a_quote_on_another_given_page_is_reported_as_misnumbered() -> None:
+    raw = 'Locked after 100 attempts [1].\nQuotes:\n[1] "locked after one hundred failed attempts"'
+    result = parse(raw, HITS, TEXTS)
+    citation = result.citations[0]
+    assert not citation.verified and not result.grounded  # still checked on the cited page
+    assert citation.quote_on is HITS[1]
+    verified = parse(
+        'Fifteen [1].\nQuotes:\n[1] "be at least fifteen characters long"', HITS, TEXTS
+    )
+    assert verified.citations[0].quote_on is None
+    nowhere = parse('X [1].\nQuotes:\n[1] "words that are on no page at all"', HITS, TEXTS)
+    assert nowhere.citations[0].quote_on is None
+
+
+def test_ask_names_the_page_a_misnumbered_quote_is_on(
+    folder: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _indexed(folder)
+    capsys.readouterr()
+    with fake_model_server() as (url, models):
+        monkeypatch.setenv("ASKPDF_OLLAMA_URL", url)
+        models.chat_reply = ['Secure [1].\nQuotes:\n[1] "Cookies need the Secure flag"']
+        assert main(_ask(folder, "passwords characters cookies")) == 3
+    out = capsys.readouterr().out
+    assert "the quoted words are on policy.pdf page 2" in out

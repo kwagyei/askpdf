@@ -692,6 +692,13 @@ def _print_answer(result: Answer, out: TextIO, err: TextIO) -> int:
         print(f"[{c.number}] {shown(source_name(c.hit))}  {where}", file=out)
         if not c.quotes:
             print("    no quote given", file=out)
+        if c.quote_on is not None:
+            elsewhere = page_ref(c.quote_on.page, shown(c.quote_on.label))
+            print(
+                f"    the quoted words are on {shown(source_name(c.quote_on))} {elsewhere};"
+                " the answer numbered its source wrongly",
+                file=out,
+            )
         for q in c.quotes:
             mark = "\u2713" if q.verified else f"\u2717 {q.reason}:"
             print(f"    {mark} \u201c{shown(q.quote)}\u201d", file=out)

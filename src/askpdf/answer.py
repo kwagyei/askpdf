@@ -38,10 +38,13 @@ quotes. Copy at least 5 words in a row, exactly as they appear on the page.
 3. If the pages do not contain the answer, reply with exactly {NOT_FOUND} and nothing else.
 
 Example of the format:
-The tank holds 40 litres when full [2]. It is refilled every Monday [1].
+The tank holds 40 litres when full [1]. It is refilled every Monday [2].
 Quotes:
-[2] "the tank holds 40 litres of water when full"
-[1] "the tank is refilled every Monday morning\""""
+[1] "the tank holds 40 litres of water when full"
+[2] "the tank is refilled every Monday morning"
+
+The number before a quote must be the number of the page the words were copied from.\
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +62,10 @@ class Citation:
     number: int  # as shown in the final answer: renumbered by first use
     hit: PageHit
     quotes: tuple[QuoteCheck, ...]
+    # When no quote is on the cited page but one is word for word on another page the
+    # model was given: the model numbered its source wrongly. The citation stays
+    # unverified; this only says where the words are.
+    quote_on: PageHit | None = None
 
     @property
     def verified(self) -> bool:
@@ -102,7 +109,12 @@ def build_prompt(
         text = texts.get((hit.sha256, hit.page), hit.best_chunk.text)
         if len(text) > MAX_PAGE_CHARS:
             text = text[:MAX_PAGE_CHARS] + " …"
-        blocks.append(f"[{n}] {source_name(hit)}, page {hit.page}{printed}\n{text}")
+        # The number opens and closes the block: a 3B model otherwise loses track of
+        # which block a sentence came from and cites its neighbour (eval/TUNING.md).
+        blocks.append(
+            f"=== Page [{n}]: {source_name(hit)}, page {hit.page}{printed} ===\n{text}\n"
+            f"=== End of page [{n}] ==="
+        )
     return "Pages:\n\n" + "\n\n".join(blocks) + f"\n\nQuestion: {question}"
 
 
@@ -188,6 +200,26 @@ def _quotes(section: str) -> dict[int, list[str]]:
     return found
 
 
+def _misnumbered(
+    checks: Sequence[QuoteCheck],
+    n: int,
+    hits: Sequence[PageHit],
+    texts: Mapping[tuple[str, int], str],
+    keys: PageKeys,
+) -> PageHit | None:
+    """The other given page holding one of these quotes, if none is on page ``n``."""
+    if not checks or any(c.verified for c in checks):
+        return None
+    for other, hit in enumerate(hits, start=1):
+        if other == n:
+            continue
+        page = texts.get((hit.sha256, hit.page), "")
+        page_keys = keys.get((hit.sha256, hit.page), page)
+        if any(check(c.quote, page, page_keys).verified for c in checks):
+            return hit
+    return None
+
+
 def parse(raw: str, hits: Sequence[PageHit], texts: Mapping[tuple[str, int], str]) -> Answer:
     """Validate what the model wrote against the pages it was given."""
     body, section = _split(raw)
@@ -222,7 +254,7 @@ def parse(raw: str, hits: Sequence[PageHit], texts: Mapping[tuple[str, int], str
         page = texts.get((hit.sha256, hit.page), "")
         page_keys = keys.get((hit.sha256, hit.page), page)
         checks = tuple(check(q, page, page_keys) for q in quotes.get(n, []))
-        citations.append(Citation(shown, hit, checks))
+        citations.append(Citation(shown, hit, checks, _misnumbered(checks, n, hits, texts, keys)))
     verified = {c.number for c in citations if c.verified}
     sentences = [s for s in _SENTENCE.split(text) if _LETTER.search(s)]
     supported = sum(

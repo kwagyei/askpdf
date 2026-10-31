@@ -69,6 +69,24 @@ The prompt wording was changed once, after one ad-hoc question about NIST passwo
 the first wording put `[n]` only in the Quotes section, never after sentences, so rule 1
 now asks for a number at the end of every sentence and the example shows two.
 
+## Answer prompt: block numbering (2026-10-31)
+
+The first full dev run (58 questions) verified 12 of 52 citations (0.231). Of the 29
+citations whose quote failed, 22 quoted words that are on the page word for word, but
+under the wrong number: the words were on another of the 3 pages the model was given,
+usually `[1]` cited as `[2]`. The checker was right to fail them (a citation names a
+page), so the fix belongs in the prompt:
+
+- the example cited `[2]` before `[1]`; it now cites in order. On 4 of the failing
+  questions this alone changed nothing;
+- each page block now opens with `=== Page [n]: file, page … ===` and closes with
+  `=== End of page [n] ===`. On the same 4 questions, 1 became verified and 1 more cited
+  the right page with a paraphrased quote.
+
+A full rerun with both changes is the one recorded in `eval/results/dev-answers.json`.
+A quote that is on another given page is now reported as such (`quote_on`), both in
+`ask` and as `unverified_misnumbered` in the results, but it still does not verify.
+
 ## Test-split exposure
 
 On 2026-10-21, while checking the `--split test` guard, a test run printed aggregate

@@ -89,6 +89,12 @@ def record(q: Question, result: Answer, seconds: float) -> dict[str, Any]:
                 and not any(x.verified and not x.needed_folding for x in c.quotes),
                 "quotes": [x.quote for x in c.quotes],
                 "reasons": [x.reason for x in c.quotes],
+                "quote_on": None
+                if c.quote_on is None
+                else [
+                    PurePath(c.quote_on.paths[0]).stem if c.quote_on.paths else "",
+                    c.quote_on.page,
+                ],
             }
             for c in result.citations
         ],
@@ -137,7 +143,9 @@ def summarise(records: dict[str, dict[str, Any]]) -> dict[str, Any]:
             # Per answer, so citations of one answer are not counted as independent.
             "grounded_interval_95": _interval(grounded),
             "dropped_citations": sum(len(r["dropped"]) for r in answered),
-            # Unverified citations by cause: no quote at all, or only quotes under 5 words.
+            # Unverified citations by cause: no quote at all, only quotes under 5 words, or
+            # words that are on another page the model was given (a wrong number).
+            "unverified_misnumbered": sum(c["quote_on"] is not None for c in citations),
             "unverified_no_quote": sum(not c["quotes"] for c in citations),
             "unverified_too_short": sum(
                 bool(c["quotes"]) and all(x.startswith("shorter") for x in c["reasons"])
