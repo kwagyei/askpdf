@@ -94,7 +94,37 @@ def conversation() -> str:
     )
 
 
-RENDER = {"extraction": extraction, "retrieval": retrieval, "conversation": conversation}
+def answers() -> str:
+    an = _load("dev-answers.json")
+    g, a = an["grounding"], an["abstention"]
+    gi = g["grounded_interval_95"]
+    return (
+        f"Answers from {an['model']} (Ollama {an['ollama_version']}) on the"
+        f" {an['n_questions']} dev questions, {an['k']} BM25 pages each:\n\n"
+        "| Measure | Result |\n| --- | --- |\n"
+        f"| Citations whose quote is on the cited page |"
+        f" {round(g['quote_verified_rate'] * g['n_citations'])} of {g['n_citations']}"
+        f" ({_f(g['quote_verified_rate'])}) |\n"
+        f"| of those, verified only by folding hyphens | {_f(g['folding_only_share'])} |\n"
+        f"| Answer sentences carrying a verified citation | {_f(g['supported_sentence_rate'])} |\n"
+        f"| Answers with at least one verified citation | {_f(g['grounded_rate'])}"
+        f" of {g['n_answers']} (95% interval {gi[0]:.2f} to {gi[1]:.2f}) |\n"
+        f"| Unanswerable questions answered anyway |"
+        f" {round(a['false_answer_rate'] * an['n_unanswerable'])} of {an['n_unanswerable']} |\n"
+        f"| NOT_FOUND precision / recall | {_f(a['not_found_precision'])}"
+        f" / {_f(a['not_found_recall'])} |\n"
+        f"| Answerable questions answered NOT_FOUND |"
+        f" {round(a['over_abstention_rate'] * an['n_answerable'])} of {an['n_answerable']} |\n"
+        f"| Median time per answer | {an['seconds_median']:.0f} s |\n"
+    )
+
+
+RENDER = {
+    "extraction": extraction,
+    "retrieval": retrieval,
+    "conversation": conversation,
+    "answers": answers,
+}
 
 
 def render_readme(text: str) -> str:

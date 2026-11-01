@@ -8,9 +8,9 @@ page. It runs locally with [Ollama](https://ollama.com); nothing leaves your mac
 you opt in to a remote model.
 
 > **Work in progress.** The design is settled and the code arrives through pull requests.
-> What works today: reading a folder of PDFs into the local index and searching it by
-> keyword (BM25) or by meaning (embeddings from a local model). Answers and the web app
-> come next.
+> What works today, from the command line: reading a folder of PDFs into a local index,
+> searching it by keyword (BM25) or by meaning (embeddings from a local model), and
+> answering questions with checked citations. The web app comes next.
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -35,6 +35,48 @@ keyword, and askpdf says so. Re-running `index` only reads new or changed files 
 embeds chunks that have no vector yet; renamed and copied files are recognised by their
 content. The index lives in your cache folder, never in the folder you point it at.
 
+### Answers with checked quotes
+
+`askpdf ask FOLDER "question"` gives the 3 best pages to a local model (llama3.2:3b via
+Ollama by default) and asks for an answer that cites them as `[1]`, `[2]`, followed by a
+quote from each cited page, or `NOT_FOUND` if the pages do not say. askpdf then checks the
+reply instead of trusting it:
+
+- A citation must name one of the pages the model was given; any other number is removed.
+  File names and page numbers are always taken from the index, never from the model's text.
+- Each quote must appear on the cited page. "Appear" means a plain substring match after
+  ignoring case, the style of quote marks and dashes, runs of whitespace, and a hyphen
+  between two letters (so `multi-factor` matches `multifactor`). A hyphen next to a digit
+  counts (`SP 800-63B` is not `SP 80063B`), and nothing else is forgiven: a changed letter,
+  a dropped word or an added "not" fails. Quotes under 5 words are not accepted.
+- Every source is printed with a ✓ or the reason its quote failed. An answer with no
+  verified quote is flagged as ungrounded, and `ask` exits with status 3.
+
+A verified quote proves that these words are on that page, not that they support the
+sentence they are attached to.
+
+A real run on the development Mac (Intel, CPU only); two long quotes are shortened where marked …:
+
+```text
+$ askpdf ask ~/Documents/papers "Which Unicode normalization form should be applied to passwords before hashing?"
+answering from 3 pages…
+The Unicode normalization form that should be applied to passwords before hashing is NFC normalization defined in Sec. 12.1 of Unicode Normalization Forms [UAX15].
+
+Sources:
+[1] nist-sp-800-63b-4.pdf  p. 15 (PDF page 26)
+    ✓ “This process is applied before hashing the byte string that represents the password”
+[2] nist-sp-800-63b-4.pdf  p. 16 (PDF page 27)
+    the quoted words are on nist-sp-800-63b-4.pdf p. 15 (PDF page 26); the answer numbered its source wrongly
+    ✗ not found on the page: “Subscribers choosing passwords that contain Unicode characters SHOULD be advised …”
+[3] nist-sp-800-63b-4.pdf  p. 87 (PDF page 98)
+    the quoted words are on nist-sp-800-63b-4.pdf p. 15 (PDF page 26); the answer numbered its source wrongly
+    ✗ not found on the page: “The entire password SHALL be subject to comparison, not substrings or words …”
+```
+
+The answer is right (page 26 names NFC), but only one of its three quotes checks out: the
+other two are real sentences from page 26, filed under the wrong number. That is typical
+of the 3B model, and the results below count it.
+
 ## What makes it different
 
 The interesting part is not the chatbot but the measurement. Each stage is scored on its own,
@@ -44,8 +86,8 @@ so a bad answer can be traced to where it went wrong:
 | --- | --- | --- |
 | Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
 | Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25, dense and hybrid measured |
-| Grounding | Does the cited page actually contain the quote? | planned |
-| Abstention | Does it say "not found" instead of guessing? | planned |
+| Grounding | Does the cited page actually contain the quote? | measured on dev (local model) |
+| Abstention | Does it say "not found" instead of guessing? | measured on dev (local model) |
 | Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
 | Latency | How long does it take on an 8 GB laptop without a GPU? | planned |
 
@@ -103,6 +145,33 @@ Follow-up questions (14 on dev, such as "What about at AAL3?"), searched three w
 | hand-written rewrite | 0.857 (0.64 to 1.00) | 0.933 |
 <!-- /results -->
 
+### Answers (development split, local model)
+
+These need Ollama, so they are run by hand on the development Mac (Intel, no GPU) and
+committed, not rerun in CI. Every reply is kept in `eval/results/dev-answers.json`.
+
+<!-- results:answers -->
+Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each:
+
+| Measure | Result |
+| --- | --- |
+| Citations whose quote is on the cited page | 11 of 59 (0.186) |
+| of those, verified only by folding hyphens | 0.000 |
+| Answer sentences carrying a verified citation | 0.159 |
+| Answers with at least one verified citation | 0.224 of 49 (95% interval 0.12 to 0.35) |
+| Unanswerable questions answered anyway | 3 of 9 |
+| NOT_FOUND precision / recall | 1.000 / 0.667 |
+| Answerable questions answered NOT_FOUND | 0 of 49 |
+| Median time per answer | 63 s |
+<!-- /results -->
+
+The small local model rarely answers in the checkable form: of the citations that failed, 13 quoted the right words under the number of another page
+it was given, and 20 had no quote because the model copied the page's wording into the
+answer sentence instead. So the grounding rate here says more about a 3B model following
+a format than about whether its answers are true; a larger model, or a remote one with
+`--api-url`, is the obvious thing to try. Unanswerable questions are where it helps most:
+it said "not found" for 6 of 9 and never for an answerable one.
+
 **Who wrote the evaluation data.** The questions, conversations and page transcriptions
 were drafted by an AI model (Claude) working as the project's lead developer, and are
 being checked by hand by the author. The questions were written from askpdf's extracted
@@ -116,6 +185,15 @@ checked against the text askpdf actually extracts. The corpus files and their li
 listed in `eval/corpus/SOURCES.md`.
 
 ## Known limitations (so far)
+
+- Answers are slow on a laptop without a GPU. On the Intel Mac this was built on, the 3B
+  model reads the 3 pages for most of a minute before it writes; the median answer on the
+  development questions took 63 seconds. Fewer pages are sent for that reason, so a few answers miss
+  their page (see `eval/TUNING.md`).
+- Whether an answer is *correct* is not measured yet; the checks above show that quoted
+  words are on the cited page, not that the answer is right. People label a sample of
+  answers at release.
+- The answer model sees only the question and the retrieved pages, not earlier turns.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
   2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about

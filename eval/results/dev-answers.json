@@ -1,0 +1,1607 @@
+{
+  "stage": "answers",
+  "split": "dev",
+  "retriever": "bm25",
+  "k": 3,
+  "model": "llama3.2:3b",
+  "ollama_version": "0.40.5",
+  "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+  "n_questions": 58,
+  "n_answerable": 49,
+  "n_unanswerable": 9,
+  "grounding": {
+    "n_answers": 49,
+    "n_citations": 59,
+    "quote_verified_rate": 0.186441,
+    "folding_only_share": 0.0,
+    "supported_sentence_rate": 0.15873,
+    "grounded_rate": 0.22449,
+    "grounded_interval_95": [
+      0.122449,
+      0.346939
+    ],
+    "dropped_citations": 2,
+    "unverified_misnumbered": 13,
+    "unverified_no_quote": 20,
+    "unverified_too_short": 2
+  },
+  "abstention": {
+    "false_answer_rate": 0.333333,
+    "not_found_precision": 1.0,
+    "not_found_recall": 0.666667,
+    "over_abstention_rate": 0.0,
+    "over_abstention_interval_95": [
+      0.0,
+      0.0
+    ]
+  },
+  "seconds_median": 63.0,
+  "per_question": {
+    "naca-01": {
+      "answerable": true,
+      "kind": "scanned",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 1,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Declassified March 16, 1959"
+          ],
+          "reasons": [
+            "shorter than 5 words"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 46.8,
+      "answer": "The memorandum on the 10-degree sweptback wing was declassified on March 16, 1959 [1].",
+      "raw": "The memorandum on the 10-degree sweptback wing was declassified on March 16, 1959 [1].\n\nQuotes:\n[1] \"Declassified March 16, 1959\""
+    },
+    "naca-03": {
+      "answerable": true,
+      "kind": "scanned",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 8,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 39.2,
+      "answer": "The flutter investigation was carried out in the Langley transonic blowdown tunnel [1].",
+      "raw": "The flutter investigation was carried out in the Langley transonic blowdown tunnel [1]."
+    },
+    "naca-05": {
+      "answerable": true,
+      "kind": "scanned",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 5,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 36.5,
+      "answer": "The models were constructed of solid Consoweld, a phenolic laminate material with high-strength paper reinforcement [1].",
+      "raw": "The models were constructed of solid Consoweld, a phenolic laminate material with high-strength paper reinforcement [1]."
+    },
+    "naca-07": {
+      "answerable": true,
+      "kind": "scanned",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 6,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 52,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "naca-rm-l56l14a",
+            6
+          ]
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 100,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "naca-rm-l56l14a",
+            6
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 77.7,
+      "answer": "The tunnel can operate from approximately 0.001 to 0.012 slug per cubic foot, which corresponds to a density range of 0.001 to 0.012 slug/cubic foot [1].",
+      "raw": "The tunnel can operate from approximately 0.001 to 0.012 slug per cubic foot, which corresponds to a density range of 0.001 to 0.012 slug/cubic foot [1].\n\nQuotes:\n[1] \"The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot\"\n[2] \"The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot\"\n[3] \"The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot\"\n[4] \"The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot\"\n[5] \"The density range of the tunnel is from approximately 0.001 to 0.012 slug per cubic foot\""
+    },
+    "naca-09": {
+      "answerable": true,
+      "kind": "scanned",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "naca-rm-l56l14a",
+          "page": 8,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Such periods are designated low-damping regions as in reference 1, since the sum of the aerodynamic and structural damping is near zero",
+            "low-damping regions"
+          ],
+          "reasons": [
+            "not found on the page",
+            "shorter than 5 words"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 51.1,
+      "answer": "A period of intermittent oscillations before continuous flutter is called a low-damping region [1].",
+      "raw": "A period of intermittent oscillations before continuous flutter is called a low-damping region [1].\n\nQuotes:\n[1] \"Such periods are designated low-damping regions as in reference 1, since the sum of the aerodynamic and structural damping is near zero\"\n[1] \"low-damping regions\""
+    },
+    "nist-01": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 15,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "Therefore, federal agencies SHALL select a minimum of AAL2 when personal information is made available online"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 50.4,
+      "answer": "The lowest assurance level federal agencies may use when they put personal information online is AAL2 [1].",
+      "raw": "The lowest assurance level federal agencies may use when they put personal information online is AAL2 [1]. \n\nQuotes:\n[1] \"Therefore, federal agencies SHALL select a minimum of AAL2 when personal information is made available online\""
+    },
+    "nist-03": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 15,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Cryptography used by verifiers operated by or on behalf of federal agencies at AAL1 SHALL be validated to meet the requirements of [FIPS140] Level 1"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            16
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 42.4,
+      "answer": "Cryptography in federal verifiers at AAL1 must be validated to meet the requirements of FIPS 140 Level 1 [1].",
+      "raw": "Cryptography in federal verifiers at AAL1 must be validated to meet the requirements of FIPS 140 Level 1 [2]. \n\nQuotes:\n[2] \"Cryptography used by verifiers operated by or on behalf of federal agencies at AAL1 SHALL be validated to meet the requirements of [FIPS140] Level 1\""
+    },
+    "nist-04": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 114,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "Unless otherwise specified, authenticated protected channels do not require the server to authenticate the client",
+            "Authentication of the server is often accomplished through a certificate chain that leads to a trusted root rather than individually with each server",
+            "The three types of authentication factors are something you know, something you have, and something you are"
+          ],
+          "reasons": [
+            "",
+            "",
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 1,
+      "seconds": 73.0,
+      "answer": "The lowest assurance level is AAL 1, which is the lowest level of assurance. According to NIST SP 800-63B-4, a session at the lowest assurance level (AAL 1) may last for a short period of time, but the exact duration is not specified in the provided pages [1].",
+      "raw": "The lowest assurance level is AAL 1, which is the lowest level of assurance. According to NIST SP 800-63B-4, a session at the lowest assurance level (AAL 1) may last for a short period of time, but the exact duration is not specified in the provided pages [3].\n\nQuotes:\n[3] \"Unless otherwise specified, authenticated protected channels do not require the server to authenticate the client.\"\n[3] \"Authentication of the server is often accomplished through a certificate chain that leads to a trusted root rather than individually with each server.\"\n[3] \"The three types of authentication factors are something you know, something you have, and something you are.\""
+    },
+    "nist-07": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 27,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Verifiers SHALL offer at least one phishing-resistant authentication option at AAL2",
+            "as described in Sec. 3.2.5"
+          ],
+          "reasons": [
+            "not found on the page",
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            18
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 54.1,
+      "answer": "Yes, verifiers SHALL offer at least one phishing-resistant authentication option at AAL2 [1].",
+      "raw": "Yes, verifiers SHALL offer at least one phishing-resistant authentication option at AAL2 [3]. \n\nQuotes:\n[3] \"Verifiers SHALL offer at least one phishing-resistant authentication option at AAL2\"\n[3] \"as described in Sec. 3.2.5\""
+    },
+    "nist-08": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 13,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the claimant is required to prove possession and control of two distinct authentication factors"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 41.9,
+      "answer": "Syncable passkeys that sync between devices may not be suitable for the highest assurance level, AAL3, due to the non-exportability requirements of AAL3, which require a phishing-resistant authenticator with a non-exportable authentication key [1].",
+      "raw": "Syncable passkeys that sync between devices may not be suitable for the highest assurance level, AAL3, due to the non-exportability requirements of AAL3, which require a phishing-resistant authenticator with a non-exportable authentication key [3].\n\nQuotes:\n[3] \"the claimant is required to prove possession and control of two distinct authentication factors\""
+    },
+    "nist-11": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 20,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 53.2,
+      "answer": "The verifier SHALL employ appropriately tailored security controls from the moderate baseline security controls defined in [SP800-53] or an equivalent federal (e.g., [FEDRAMP]) or industry standard that the organization has chosen for the information systems, applications, and online services that these guidelines are used to protect [1].",
+      "raw": "The verifier SHALL employ appropriately tailored security controls from the moderate baseline security controls defined in [SP800-53] or an equivalent federal (e.g., [FEDRAMP]) or industry standard that the organization has chosen for the information systems, applications, and online services that these guidelines are used to protect [1]."
+    },
+    "nist-12": {
+      "answerable": true,
+      "kind": "table",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 7,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Key exportability is prohibited",
+            "Key exportability is prohibited"
+          ],
+          "reasons": [
+            "shorter than 5 words",
+            "shorter than 5 words"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 57.2,
+      "answer": "According to the summary table, key exportability is prohibited at Authentication Assurance Level 3 [1].",
+      "raw": "According to the summary table, key exportability is prohibited at Authentication Assurance Level 3 [3]. \n\nQuotes:\n[3] \"Key exportability is prohibited\"\n[3] \"Key exportability is prohibited\""
+    },
+    "nist-14": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 98,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Verifiers and CSPs SHALL require passwords that are used as a single-factor authentication mechanism to be a minimum of 15 characters in length"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            25
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 54.2,
+      "answer": "The minimum password length required when it is the only factor used to log in is 15 characters [1].",
+      "raw": "The minimum password length required when it is the only factor used to log in is 15 characters [3]. \n\nQuotes:\n[3] \"Verifiers and CSPs SHALL require passwords that are used as a single-factor authentication mechanism to be a minimum of 15 characters in length\""
+    },
+    "nist-16": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 36,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            25
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 46.4,
+      "answer": "Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically, However, verifiers SHALL force a change if there is evidence that the authenticator has been compromised [1].",
+      "raw": "Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically, However, verifiers SHALL force a change if there is evidence that the authenticator has been compromised [3].\n\nQuotes:\n[3] \"Verifiers and CSPs SHALL NOT require subscribers to change passwords periodically\""
+    },
+    "nist-18": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 26,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "This process is applied before hashing the byte string that represents the password"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 27,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Subscribers choosing passwords that contain Unicode characters SHOULD be advised that some endpoints may represent some characters differently, which would affect their ability to authenticate successfully"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            26
+          ]
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 98,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "The entire password SHALL be subject to comparison, not substrings or words that might be contained therein"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            26
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 0,
+      "seconds": 54.4,
+      "answer": "The Unicode normalization form that should be applied to passwords before hashing is NFC normalization defined in Sec. 12.1 of Unicode Normalization Forms [UAX15].",
+      "raw": "The Unicode normalization form that should be applied to passwords before hashing is NFC normalization defined in Sec. 12.1 of Unicode Normalization Forms [UAX15]. \n\nQuotes:\n[1] \"This process is applied before hashing the byte string that represents the password\"\n[2] \"Subscribers choosing passwords that contain Unicode characters SHOULD be advised that some endpoints may represent some characters differently, which would affect their ability to authenticate successfully\"\n[3] \"The entire password SHALL be subject to comparison, not substrings or words that might be contained therein\""
+    },
+    "nist-20": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 53.2,
+      "answer": "The security gain from making the list of banned passwords enormous is limited, as attackers can still guess passwords that have previously proven successful, such as dictionary words and passwords from previous breaches [Policies].",
+      "raw": "The security gain from making the list of banned passwords enormous is limited, as attackers can still guess passwords that have previously proven successful, such as dictionary words and passwords from previous breaches [Policies]."
+    },
+    "nist-23": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 84,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the salt value SHALL be at least 32 bits in length",
+            "look-up secrets that are shorter than the minimum security strength specified in the latest revision of [SP800-131A]"
+          ],
+          "reasons": [
+            "not found on the page",
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            29
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 47.5,
+      "answer": "The salt value SHALL be at least 32 bits in length when short look-up secrets are stored, as specified in Sec. 3.1.2.2 [1].",
+      "raw": "The salt value SHALL be at least 32 bits in length when short look-up secrets are stored, as specified in Sec. 3.1.2.2 [3].\n\nQuotes:\n[3] \"the salt value SHALL be at least 32 bits in length\"\n[3] \"look-up secrets that are shorter than the minimum security strength specified in the latest revision of [SP800-131A]\""
+    },
+    "nist-24": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 56,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "the subscriber MAY be prompted to enter an identifier by which the CSP knows them on the endpoint associated with the new authenticator"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 94.6,
+      "answer": "Receiving a login code by text message does not protect against phishing, as an attacker could intercept the message and use the code to gain unauthorized access to the account [1].",
+      "raw": "Receiving a login code by text message does not protect against phishing, as an attacker could intercept the message and use the code to gain unauthorized access to the account [2].\n\nQuotes:\n[2] \"the subscriber MAY be prompted to enter an identifier by which the CSP knows them on the endpoint associated with the new authenticator\""
+    },
+    "nist-26": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 90,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "inform users how long they have to wait until the next attempt"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            82
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 78.6,
+      "answer": "The document does not specify a specific time limit for using a code sent to their phone before the attempt is invalid, but it does mention that users should be informed how long they have to wait until the next attempt for rate limiting (i.e., throttling), [1].",
+      "raw": "The document does not specify a specific time limit for using a code sent to their phone before the attempt is invalid, but it does mention that users should be informed how long they have to wait until the next attempt for rate limiting (i.e., throttling), [2].\n\nQuotes:\n[2] \"inform users how long they have to wait until the next attempt\""
+    },
+    "nist-28": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 31,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 56.8,
+      "answer": "Before sending a code over the phone network, verifiers SHOULD consider risk indicators (e.g., device swap, SIM change, number porting, other abnormal behavior) [1].",
+      "raw": "Before sending a code over the phone network, verifiers SHOULD consider risk indicators (e.g., device swap, SIM change, number porting, other abnormal behavior) [3]."
+    },
+    "nist-31": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 12,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "CSPs SHALL provide subscriber instructions for appropriately protecting the authenticator against theft or loss",
+            "The CSP SHALL provide a mechanism to invalidate the authenticator immediately upon notification from a subscriber that the authenticator’s loss, theft, or compromise is suspected"
+          ],
+          "reasons": [
+            "not found on the page",
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            41
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 53.3,
+      "answer": "The Credential Service Provider (CSP) SHALL provide subscriber instructions for appropriately protecting the authenticator against theft or loss [1].",
+      "raw": "The Credential Service Provider (CSP) SHALL provide subscriber instructions for appropriately protecting the authenticator against theft or loss [1]. \n\nQuotes:\n[1] \"CSPs SHALL provide subscriber instructions for appropriately protecting the authenticator against theft or loss\"\n[1] \"The CSP SHALL provide a mechanism to invalidate the authenticator immediately upon notification from a subscriber that the authenticator’s loss, theft, or compromise is suspected\""
+    },
+    "nist-33": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 43,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 60.9,
+      "answer": "A biometric system SHALL operate with an FMR [ISO/IEC2382-37] of one in 10000 or better for all demographic groups, and a false non-match rate (FNMR) of less than 5 % [1].",
+      "raw": "A biometric system SHALL operate with an FMR [ISO/IEC2382-37] of one in 10000 or better for all demographic groups, and a false non-match rate (FNMR) of less than 5 % [3]."
+    },
+    "nist-34": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 12,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "This guideline recognizes that subscribers are responsible for protecting their authentication secrets and not disclosing them to others (e.g., credential sharing)"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 69.9,
+      "answer": "This guideline does not address the authentication of a person for physical access (e.g., to a building) [1].",
+      "raw": "This guideline does not address the authentication of a person for physical access (e.g., to a building) [1]. \n\nQuotes:\n[1] \"This guideline recognizes that subscribers are responsible for protecting their authentication secrets and not disclosing them to others (e.g., credential sharing).\""
+    },
+    "nist-37": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 27,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 63.0,
+      "answer": "Biometric matching should preferably take place on the device [1].",
+      "raw": "Biometric matching should preferably take place on the device [3]."
+    },
+    "nist-38": {
+      "answerable": true,
+      "kind": "multi-page",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 87,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 9,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 79,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 75.4,
+      "answer": "There is no information on the number of failed tries in a row allowed for biometrics, compared with the general limit for authenticators, in the provided pages [1], [2], and [3].",
+      "raw": "There is no information on the number of failed tries in a row allowed for biometrics, compared with the general limit for authenticators, in the provided pages [1], [2], and [3]."
+    },
+    "nist-40": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 74,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 62.3,
+      "answer": "Passwords are not considered replay-resistant because the same authenticator output (i.e., the password itself) is provided for each authentication, making it possible for an attacker to record and replay the password to gain unauthorized access [1].",
+      "raw": "Passwords are not considered replay-resistant because the same authenticator output (i.e., the password itself) is provided for each authentication, making it possible for an attacker to record and replay the password to gain unauthorized access [3]."
+    },
+    "nist-42": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 89,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 0,
+      "seconds": 63.1,
+      "answer": "The presentation of biometric characteristics does not always establish authentication intent. For example, using a front-facing camera on a mobile phone to capture a face biometric does not necessarily constitute intent, as it can be reasonably expected to capture a face image while the device is used for other non-authentication purposes [1].",
+      "raw": "The presentation of biometric characteristics does not always establish authentication intent. For example, using a front-facing camera on a mobile phone to capture a face biometric does not necessarily constitute intent, as it can be reasonably expected to capture a face image while the device is used for other non-authentication purposes [2]."
+    },
+    "nist-43": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 48,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "the use of the PSTN for out-of-band authentication",
+            "as described in Sec. 3.1.3.3"
+          ],
+          "reasons": [
+            "",
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 90.5,
+      "answer": "The one restricted authenticator at the time these guidelines were published is the use of the PSTN for out-of-band authentication, as described in Sec. 3.1.3.3 [1].",
+      "raw": "The one restricted authenticator at the time these guidelines were published is the use of the PSTN for out-of-band authentication, as described in Sec. 3.1.3.3 [1].\n\nQuotes:\n[1] \"the use of the PSTN for out-of-band authentication\"\n[1] \"as described in Sec. 3.1.3.3\""
+    },
+    "nist-45": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 39,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 3,
+      "supported": 0,
+      "seconds": 64.3,
+      "answer": "Non-exportable authentication keys are considered more secure, and accordingly, non-exportable cryptographic keys are required at AAL3. The authentication keys on syncable authenticators are inherently exportable (see Appendix B). \n\nKeys must be kept in an isolated execution environment that is protected by hardware or in a separate processor with a controlled interface to the central processing unit of the user endpoint, [1].",
+      "raw": "Non-exportable authentication keys are considered more secure, and accordingly, non-exportable cryptographic keys are required at AAL3. The authentication keys on syncable authenticators are inherently exportable (see Appendix B). \n\nKeys must be kept in an isolated execution environment that is protected by hardware or in a separate processor with a controlled interface to the central processing unit of the user endpoint, [3]."
+    },
+    "nist-47": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 58,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "Replacement of a forgotten password where the subscriber can authenticate with one or more other authenticators is considered to be the binding of a new authenticator",
+            "see Sec. 4.1.2.1"
+          ],
+          "reasons": [
+            "",
+            "shorter than 5 words"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 1,
+      "seconds": 47.5,
+      "answer": "Replacing a forgotten password where the subscriber can authenticate with one or more other authenticators is considered to be the binding of a new authenticator (see Sec. 4.1.2.1) rather than account recovery [1].",
+      "raw": "Replacing a forgotten password where the subscriber can authenticate with one or more other authenticators is considered to be the binding of a new authenticator (see Sec. 4.1.2.1) rather than account recovery [1].\n\nQuotes:\n[1] \"Replacement of a forgotten password where the subscriber can authenticate with one or more other authenticators is considered to be the binding of a new authenticator\"\n[1] \"see Sec. 4.1.2.1\""
+    },
+    "nist-50": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 59,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "A recovery code mailed inside the contiguous United States shall be valid for at most 21 days"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 62.7,
+      "answer": "A recovery code mailed inside the contiguous United States SHALL be valid for at most 21 days [1].",
+      "raw": "A recovery code mailed inside the contiguous United States SHALL be valid for at most 21 days [1].\n\nQuotes:\n[1] \"A recovery code mailed inside the contiguous United States shall be valid for at most 21 days\""
+    },
+    "nist-52": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 62,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 0,
+      "seconds": 62.2,
+      "answer": "According to NIST SP 800-63B-4, an expired authenticator SHALL NOT be usable for authentication [1]. When an authentication is attempted using an expired authenticator, the CSP SHOULD indicate to the subscriber that the authentication failure is due to expiration rather than some other cause [1].",
+      "raw": "According to NIST SP 800-63B-4, an expired authenticator SHALL NOT be usable for authentication [1]. When an authentication is attempted using an expired authenticator, the CSP SHOULD indicate to the subscriber that the authentication failure is due to expiration rather than some other cause [1]."
+    },
+    "nist-55": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 116,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "The RP SHALL NOT interpret the presence of an access token as an indicator of the subscriber's presence in the absence of other signals"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            66
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 79.8,
+      "answer": "The RP SHALL NOT interpret the presence of an access token as an indicator of the subscriber's presence in the absence of other signals [1].",
+      "raw": "The RP SHALL NOT interpret the presence of an access token as an indicator of the subscriber's presence in the absence of other signals [2]. \n\nQuotes:\n[2] \"The RP SHALL NOT interpret the presence of an access token as an indicator of the subscriber's presence in the absence of other signals\""
+    },
+    "nist-56": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 81,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "nist-sp-800-63b-4",
+            64
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 103.4,
+      "answer": "No, session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end [1].",
+      "raw": "No, session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end [3].\n\nQuotes:\n[3] \"Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end\""
+    },
+    "nist-58": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 68,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "Session monitoring (sometimes called continuous authentication) is the ongoing evaluation of session characteristics to detect possible fraud during a session"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 85.7,
+      "answer": "The guidelines call watching a session's behavior for signs of fraud as \"session monitoring\" [1].",
+      "raw": "The guidelines call watching a session's behavior for signs of fraud as \"session monitoring\" [2].\n\nQuotes:\n[2] \"Session monitoring (sometimes called continuous authentication) is the ongoing evaluation of session characteristics to detect possible fraud during a session.\""
+    },
+    "qasper-01": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 2,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "QASPER contains 5,049 questions over 1,585 natural language processing papers",
+            "the dataset is designed to facilitate document-grounded, information-seeking QA",
+            "the dataset is the first QA dataset in the academic research domain focusing on entire papers"
+          ],
+          "reasons": [
+            "not found on the page",
+            "not found on the page",
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 132.0,
+      "answer": "The Q ASPER dataset contains 5,049 questions over 1,585 Natural Language Processing papers [1].",
+      "raw": "The Q ASPER dataset contains 5,049 questions over 1,585 Natural Language Processing papers [3]. \n\nQuotes:\n[3] \"QASPER contains 5,049 questions over 1,585 natural language processing papers\"\n[3] \"the dataset is designed to facilitate document-grounded, information-seeking QA\"\n[3] \"the dataset is the first QA dataset in the academic research domain focusing on entire papers\""
+    },
+    "qasper-03": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 7,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 156.9,
+      "answer": "According to the text, 55.5% of the answerable questions with text-only evidence have multi-paragraph evidence [1].",
+      "raw": "According to the text, 55.5% of the answerable questions with text-only evidence have multi-paragraph evidence [2]."
+    },
+    "qasper-05": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 3,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 121.5,
+      "answer": "According to the text, 25 workers wrote questions, and 51 answered them [1].",
+      "raw": "According to the text, 25 workers wrote questions, and 51 answered them [2]."
+    },
+    "qasper-07": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 3,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "Most workers (about 70%) had some experience in NLP, with 20% having more than five years of experience"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "20% of the workers had more than five years of experience"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 106,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "The vast majority (94%) of the abstracts were seen by the question-writers for the first time"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [
+        4,
+        5
+      ],
+      "sentences": 7,
+      "supported": 2,
+      "seconds": 154.5,
+      "answer": "Most workers (about 70%) had some experience in NLP, with 20% having more than five years of experience [1].\n20% of the workers had more than five years of experience [2].\nThe vast majority (94%) of the abstracts were seen by the question-writers for the first time [1].\nThe vast majority (94%) of the abstracts were seen by the question-writers for the first time [2].\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time [3].\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time .\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time .",
+      "raw": "Most workers (about 70%) had some experience in NLP, with 20% having more than five years of experience [1].\n20% of the workers had more than five years of experience [2].\nThe vast majority (94%) of the abstracts were seen by the question-writers for the first time [1].\nThe vast majority (94%) of the abstracts were seen by the question-writers for the first time [2].\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time [3].\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time [4].\nA vast majority (94%) of the abstracts were seen by the question-writers for the first time [5].\nQuotes:\n[1] \"Most workers (about 70%) had some experience in NLP, with 20% having more than five years of experience\"\n[2] \"20% of the workers had more than five years of experience\"\n[3] \"The vast majority (94%) of the abstracts were seen by the question-writers for the first time\"\n[4] \"The vast majority (94%) of the abstracts were seen by the question-writers for the first time\"\n[5] \"A vast majority (94%) of the abstracts were seen by the question-writers for the first time\""
+    },
+    "qasper-08": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 3,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the tutorials and qualification exams for the answer annotators were built using CrowdAQ"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 76.9,
+      "answer": "The tutorials and qualification exams for the answer annotators were built using CrowdAQ [1].",
+      "raw": "The tutorials and qualification exams for the answer annotators were built using CrowdAQ [1].\n\nQuotes:\n[1] \"the tutorials and qualification exams for the answer annotators were built using CrowdAQ\""
+    },
+    "qasper-11": {
+      "answerable": true,
+      "kind": "table",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 53.9,
+      "answer": "Most of the questions (67%) are specific to the papers they are written about [1].",
+      "raw": "Most of the questions (67%) are specific to the papers they are written about [2]."
+    },
+    "qasper-12": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 3,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 117.8,
+      "answer": "On average, each question is answered by 1.6 annotators (up to a maximum of 6 annotators for the same question), [1].",
+      "raw": "On average, each question is answered by 1.6 annotators (up to a maximum of 6 annotators for the same question), [2]."
+    },
+    "qasper-14": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 5,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 145.7,
+      "answer": "The train, validation and test sets contain 2,593, 1,005, and 1,451 questions, respectively [1].",
+      "raw": "The train, validation and test sets contain 2,593, 1,005, and 1,451 questions, respectively [1]."
+    },
+    "qasper-15": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 5,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "we assess the performance of the workers when evaluated against each other using the same metrics on a sample of the test set"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 1,
+      "seconds": 87.6,
+      "answer": "The estimated human performance in Answer-F1 and Evidence-F1 is 60.9 and 71.6, respectively [1].",
+      "raw": "The estimated human performance in Answer-F1 and Evidence-F1 is 60.9 and 71.6, respectively [1]. \n\nQuotes:\n[1] \"we assess the performance of the workers when evaluated against each other using the same metrics on a sample of the test set\" \n\"we compute an average over all such combinations\""
+    },
+    "qasper-17": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 90.3,
+      "answer": "The share of papers that fit into the model's 16K-token input is 100% [1].",
+      "raw": "The share of papers that fit into the model's 16K-token input is 100% [3]."
+    },
+    "qasper-19": {
+      "answerable": true,
+      "kind": "lexical",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the learning rate scheduler used 10% warmup"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 7,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the learning rate scheduler with 10% warmup"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the learning rate scheduler used a triangular learning rate"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 96.2,
+      "answer": "The learning rate scheduler used 10% warmup [1].",
+      "raw": "The learning rate scheduler used 10% warmup [1].\n\nQuotes:\n[1] \"the learning rate scheduler used 10% warmup\"\n[2] \"the learning rate scheduler with 10% warmup\"\n[3] \"the learning rate scheduler used a triangular learning rate\"\n[4] \"the learning rate scheduler with 10% warmup was used\"\n[5] \"the learning rate scheduler used a triangular learning rate schedule\""
+    },
+    "qasper-21": {
+      "answerable": true,
+      "kind": "table",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 5,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [],
+          "reasons": [],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 89.5,
+      "answer": "The TF-IDF baseline performed poorly at selecting evidence on the test set, with an Evidence-F1 score of 9.20 [1].",
+      "raw": "The TF-IDF baseline performed poorly at selecting evidence on the test set, with an Evidence-F1 score of 9.20 [3]."
+    },
+    "qasper-23": {
+      "answerable": true,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 7,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "we find that LED often predicts shorter spans than the gold answers (9.5 words shorter than gold counterparts, on average)"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 58.1,
+      "answer": "The model's predicted spans are 9.5 words shorter than the gold answers on average [1].",
+      "raw": "The model's predicted spans are 9.5 words shorter than the gold answers on average [1].\n\nQuotes:\n[1] \"we find that LED often predicts shorter spans than the gold answers (9.5 words shorter than gold counterparts, on average)\""
+    },
+    "qasper-26": {
+      "answerable": true,
+      "kind": "table",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the human lower bound is 69.44 for answering questions in QASPER"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 7,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the human lower bound is 71.62 for selecting evidence in QASPER"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 2,
+      "supported": 0,
+      "seconds": 80.1,
+      "answer": "The human lower bounds for answering questions in QASPER are 69.44 and 78.98, while the best model, LED-base, achieves 69.05 and 66.67, respectively, in the overall and development test sets, respectively [1]. The human lower bounds for selecting evidence are 71.62, while the best model, LED-base, achieves 29.85 and 39.37, respectively, in the development and test sets, respectively [2].",
+      "raw": "The human lower bounds for answering questions in QASPER are 69.44 and 78.98, while the best model, LED-base, achieves 69.05 and 66.67, respectively, in the overall and development test sets, respectively [1]. The human lower bounds for selecting evidence are 71.62, while the best model, LED-base, achieves 29.85 and 39.37, respectively, in the development and test sets, respectively [3].\n\nQuotes:\n[1] \"the human lower bound is 69.44 for answering questions in QASPER\"\n[3] \"the human lower bound is 71.62 for selecting evidence in QASPER\""
+    },
+    "un-01": {
+      "answerable": false,
+      "kind": "lexical",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 48.1,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-02": {
+      "answerable": false,
+      "kind": "paraphrase",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 59.2,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-04": {
+      "answerable": false,
+      "kind": "paraphrase",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 40.9,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-06": {
+      "answerable": false,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 2,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the question is answerable, and output a predicted answer, that is one or more spans in the full-text of the paper, yes, no or other free-form text"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": [
+            "qasper-2105.03011v1",
+            4
+          ]
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 91.1,
+      "answer": "The annotators spent a total of 25 workers writing questions for 25 hours, and 51 workers answering questions for 51 hours, but the question asks for the total hours spent writing questions, so the answer is 25 hours [1].",
+      "raw": "The annotators spent a total of 25 workers writing questions for 25 hours, and 51 workers answering questions for 51 hours, but the question asks for the total hours spent writing questions, so the answer is 25 hours [2].\n\nQuotes:\n[2] \"the question is answerable, and output a predicted answer, that is one or more spans in the full-text of the paper, yes, no or other free-form text\""
+    },
+    "un-07": {
+      "answerable": false,
+      "kind": "lexical",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 66.6,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-10": {
+      "answerable": false,
+      "kind": "scanned",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 40.3,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-13": {
+      "answerable": false,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 6,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the model uses the Longformer-Encoder-Decoder (LED) architecture, which is similar to BART (Lewis et al., 2020) in terms of number of layers and hidden state sizes"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 1,
+      "supported": 0,
+      "seconds": 104.8,
+      "answer": "The LED model was written in a variant of the BERT model, which is based on the Transformer architecture, and it uses the Longformer-Encoder-Decoder (LED) architecture, which is similar to BART (Lewis et al., 2020) in terms of number of layers and hidden state sizes, but with a larger position embeddings matrix, allowing it to process inputs of up to 16K tokens long [1].",
+      "raw": "The LED model was written in a variant of the BERT model, which is based on the Transformer architecture, and it uses the Longformer-Encoder-Decoder (LED) architecture, which is similar to BART (Lewis et al., 2020) in terms of number of layers and hidden state sizes, but with a larger position embeddings matrix, allowing it to process inputs of up to 16K tokens long [2].\n\nQuotes:\n[2] \"the model uses the Longformer-Encoder-Decoder (LED) architecture, which is similar to BART (Lewis et al., 2020) in terms of number of layers and hidden state sizes\""
+    },
+    "un-14": {
+      "answerable": false,
+      "kind": "scanned",
+      "not_found": true,
+      "citations": [],
+      "dropped": [],
+      "sentences": 0,
+      "supported": 0,
+      "seconds": 39.0,
+      "answer": "NOT_FOUND",
+      "raw": "NOT_FOUND"
+    },
+    "un-15": {
+      "answerable": false,
+      "kind": "paraphrase",
+      "not_found": false,
+      "citations": [
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 78,
+          "verified": true,
+          "needed_folding": false,
+          "quotes": [
+            "processing of attributes may carry different privacy risks that call for obtaining consent or allowing subscribers more control over the use or disclosure of specific attributes"
+          ],
+          "reasons": [
+            ""
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "nist-sp-800-63b-4",
+          "page": 21,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the agency SHALL consult with their Senior Agency Official for Privacy (SAOP) and conduct an analysis to determine whether the collection of personal information triggers the requirements of the Privacy Act of 1974 or the E-Government Act of 2002"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        },
+        {
+          "doc": "qasper-2105.03011v1",
+          "page": 4,
+          "verified": false,
+          "needed_folding": false,
+          "quotes": [
+            "the penalty for an agency that ignores these guidelines is not explicitly stated"
+          ],
+          "reasons": [
+            "not found on the page"
+          ],
+          "quote_on": null
+        }
+      ],
+      "dropped": [],
+      "sentences": 3,
+      "supported": 0,
+      "seconds": 89.2,
+      "answer": "According to NIST SP 800-63B-4, the penalty for an agency that ignores these guidelines is not explicitly stated, but the guidelines are intended to provide a framework for agencies to follow to ensure the privacy and security of personal information, and to mitigate privacy risks. The guidelines recommend that agencies consult with their Senior Agency Official for Privacy (SAOP) and conduct an analysis to determine whether the collection of personal information triggers the requirements of the Privacy Act of 1974 or the E-Government Act of 2002. If an agency fails to comply with these guidelines, it may be subject to penalties and fines for non-compliance.",
+      "raw": "According to NIST SP 800-63B-4, the penalty for an agency that ignores these guidelines is not explicitly stated, but the guidelines are intended to provide a framework for agencies to follow to ensure the privacy and security of personal information, and to mitigate privacy risks. The guidelines recommend that agencies consult with their Senior Agency Official for Privacy (SAOP) and conduct an analysis to determine whether the collection of personal information triggers the requirements of the Privacy Act of 1974 or the E-Government Act of 2002. If an agency fails to comply with these guidelines, it may be subject to penalties and fines for non-compliance.\n\nQuotes:\n[1] \"processing of attributes may carry different privacy risks that call for obtaining consent or allowing subscribers more control over the use or disclosure of specific attributes\"\n[2] \"the agency SHALL consult with their Senior Agency Official for Privacy (SAOP) and conduct an analysis to determine whether the collection of personal information triggers the requirements of the Privacy Act of 1974 or the E-Government Act of 2002\"\n[3] \"the penalty for an agency that ignores these guidelines is not explicitly stated\""
+    }
+  }
+}

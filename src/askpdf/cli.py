@@ -1,10 +1,9 @@
 """Command-line entry point.
 
 Results go to stdout and progress to stderr, so output can be piped. Exit codes:
-0 success, 1 a run-time problem (missing folder, unusable or busy index), 2 bad
-options, 130 interrupted.
-The remaining subcommands (serve, ask, bench) and the other eval stages arrive in later
-pull requests.
+0 success, 1 a run-time problem (missing folder, unusable or busy index, no model), 2 bad
+options, 3 an answer none of whose quotes was found on its cited page, 130 interrupted.
+The remaining subcommands (serve, bench) arrive in later pull requests.
 """
 
 import argparse
@@ -17,14 +16,26 @@ import sqlite3
 import sys
 import unicodedata
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, TextIO, cast
 
 from askpdf import __version__
+from askpdf.answer import (
+    ANSWER_K,
+    Answer,
+    Final,
+    Pages,
+    answer,
+    build_prompt,
+    context_window,
+    source_name,
+)
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import build_records, embed_missing, index_folder, pins
-from askpdf.providers import http, ollama
+from askpdf.providers import http, ollama, openai_compat
+from askpdf.providers.base import ChatModel
 from askpdf.providers.ollama import OllamaEmbedder
 from askpdf.providers.openai_compat import allow_remote
 from askpdf.retrieve import (
@@ -84,8 +95,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_RETRIEVER,
         help=f"ranking method (default: {DEFAULT_RETRIEVER}; dense and hybrid need Ollama)",
     )
+    ask = commands.add_parser("ask", help="answer a question, citing pages with checked quotes")
+    with_target(ask)
+    ask.add_argument("question", metavar="QUESTION")
+    ask.add_argument(
+        "-k",
+        type=_positive,
+        default=ANSWER_K,
+        metavar="N",
+        help=f"pages to answer from (default: {ANSWER_K})",
+    )
+    ask.add_argument(
+        "--retriever",
+        choices=list(RETRIEVERS),
+        default=DEFAULT_RETRIEVER,
+        help=f"ranking method (default: {DEFAULT_RETRIEVER})",
+    )
+    ask.add_argument(
+        "--show-context", action="store_true", help="print the pages given to the model"
+    )
+    ask.add_argument(
+        "--model", metavar="NAME", help=f"chat model (default: Ollama's {ollama.CHAT_MODEL})"
+    )
+    ask.add_argument(
+        "--api-url",
+        metavar="URL",
+        help="an OpenAI-compatible endpoint (e.g. https://host/v1) instead of Ollama;"
+        " the key is read from ASKPDF_API_KEY",
+    )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
-    evaluate.add_argument("stage", choices=["extraction", "retrieval", "conversation"])
+    evaluate.add_argument("stage", choices=["extraction", "retrieval", "conversation", "answers"])
     evaluate.add_argument(
         "--split",
         choices=["dev", "test"],
@@ -313,7 +352,11 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
                 f"{args.stage} on the test split was already scored for {args.release}"
                 f" ({release_file}); the test split is scored once per release",
             )
-    run = {"retrieval": _eval_retrieval, "conversation": _eval_conversation}
+    run = {
+        "retrieval": _eval_retrieval,
+        "conversation": _eval_conversation,
+        "answers": _eval_answers,
+    }
     try:
         summary = run.get(args.stage, _eval_extraction)(args, out)
     except ValueError as exc:
@@ -400,6 +443,71 @@ def _eval_conversation(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     return summary
 
 
+def _eval_answers(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
+    from askpdf.evaluate import answers, questions, retrieval  # only `eval` needs them
+
+    path = args.eval_dir / "questions" / f"{args.split}.jsonl"
+    if not path.is_file():
+        raise ValueError(f"no question set at {path}")
+    # Needs Ollama, so it runs locally, never in the CI gate (design §16).
+    url = ollama.base_url()
+    try:
+        http.require_local_or_allowed(url, allow_remote(args.allow_remote))
+        provenance = {"model": ollama.CHAT_MODEL, **ollama.server_info(url, ollama.CHAT_MODEL)}
+    except http.ProviderError as exc:
+        raise ValueError(f"{exc}; the answers stage needs Ollama running") from exc
+    snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
+
+    def chat(question: str, hits: Sequence[PageHit]) -> ollama.OllamaChat:
+        prompt = build_prompt(question, hits, snapshot.texts)
+        return ollama.OllamaChat(url, num_ctx=context_window(prompt, 768))
+
+    def progress(done: int, total: int, qid: str) -> None:
+        print(f"answering {done}/{total} ({qid})", file=sys.stderr, flush=True)
+
+    try:
+        records = answers.run(
+            questions.load(path),
+            snapshot,
+            lambda q, k: search_bm25(snapshot, q, k),
+            chat,
+            progress,
+        )
+    except http.ProviderError as exc:
+        raise ValueError(f"{exc}; the answers stage needs Ollama running") from exc
+    result = answers.summarise(records)
+    summary = {
+        "stage": "answers",
+        "split": args.split,
+        "retriever": "bm25",
+        "k": ANSWER_K,
+        **provenance,
+        **result,
+        "per_question": dict(sorted(records.items())),
+    }
+    if args.release:
+        summary["release"] = args.release
+    g, a = result["grounding"], result["abstention"]
+    print(
+        f"answers on {args.split}, {result['n_questions']} questions, {ollama.CHAT_MODEL}", file=out
+    )
+    print(
+        f"  grounding: quote-verified {_fmt(g['quote_verified_rate'])}"
+        f"  (folding only {_fmt(g['folding_only_share'])})"
+        f"  supported sentences {_fmt(g['supported_sentence_rate'])}"
+        f"  grounded answers {_fmt(g['grounded_rate'])}",
+        file=out,
+    )
+    print(
+        f"  abstention: false answers {_fmt(a['false_answer_rate'])}"
+        f"  NOT_FOUND precision {_fmt(a['not_found_precision'])}"
+        f" recall {_fmt(a['not_found_recall'])}"
+        f"  over-abstention {_fmt(a['over_abstention_rate'])}",
+        file=out,
+    )
+    return summary
+
+
 def _eval_extraction(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
     from askpdf.evaluate import extraction  # only `eval` needs it
 
@@ -457,25 +565,34 @@ def _print_hit(rank: int, hit: PageHit, out: TextIO, retriever: str = "bm25") ->
     print(f"   {shown(_snippet(hit.best_chunk.text))}", file=out)
 
 
-def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+def _load_snapshot(args: argparse.Namespace, err: TextIO) -> Snapshot | None:
     if args.path.exists() and not _index_path(args).exists():
-        return _error(err, f"nothing indexed yet; run: askpdf index {args.path}")
+        _error(err, f"nothing indexed yet; run: askpdf index {args.path}")
+        return None
     store = _open_store(args, err, reading=True)
     if store is None:
-        return 1
+        return None
     with store:
         try:
             store.check_folder(folder_key(args.path))
         except WrongFolderError as exc:
-            return _error(err, exc)
+            _error(err, exc)
+            return None
         if not store.pins_match(pins(PypdfExtractor(), ChunkParams())):
             # Stale text (e.g. an older cleaning) would give wrong results and quotes.
-            return _error(
+            _error(
                 err,
                 f"the index was built with other settings or an older askpdf;"
                 f" run: askpdf index {args.path}",
             )
-        snapshot = Snapshot.load(store)
+            return None
+        return Snapshot.load(store)
+
+
+def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    snapshot = _load_snapshot(args, err)
+    if snapshot is None:
+        return 1
     hits, used = _search(args, snapshot, err)
     if not hits:
         print("no page matches any word of the question", file=err)
@@ -514,6 +631,90 @@ def _search(args: argparse.Namespace, snapshot: Snapshot, err: TextIO) -> tuple[
     return search_bm25(snapshot, args.question, args.k), "bm25"
 
 
+def _chat(args: argparse.Namespace) -> ChatModel:
+    """Ollama on this machine by default; an OpenAI-compatible endpoint with --api-url."""
+    if args.api_url:
+        if not args.model:
+            raise http.ProviderError("--api-url needs --model")
+        return openai_compat.from_env(args.api_url, args.model, args.allow_remote)
+    url = ollama.base_url()
+    http.require_local_or_allowed(url, allow_remote(args.allow_remote))
+    return ollama.OllamaChat(url, args.model or ollama.CHAT_MODEL)
+
+
+def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    snapshot = _load_snapshot(args, err)
+    if snapshot is None:
+        return 1
+    try:
+        chat = _chat(args)
+    except http.ProviderError as exc:
+        return _error(err, exc)
+    hits, _ = _search(args, snapshot, err)
+    if isinstance(chat, ollama.OllamaChat):
+        prompt = build_prompt(args.question, hits, snapshot.texts)
+        chat = replace(chat, num_ctx=context_window(prompt, chat.max_tokens))
+    final: Answer | None = None
+    try:
+        for event in answer(args.question, hits, snapshot.texts, chat):
+            if isinstance(event, Pages):
+                print(f"answering from {_plural(len(event.hits), 'page')}…", file=err)
+                if args.show_context and event.hits:
+                    print(
+                        _shown_lines(build_prompt(args.question, event.hits, snapshot.texts)),
+                        file=err,
+                    )
+            elif isinstance(event, Final):
+                final = event.answer
+    except http.UnreachableError as exc:
+        return _error(err, f"{exc}; start Ollama (ollama serve) and try again")
+    except http.ProviderError as exc:
+        return _error(err, exc)
+    if final is None:  # answer() always ends with Final; this is for the type checker
+        return _error(err, "the answer did not finish")
+    return _print_answer(final, out, err)
+
+
+def _shown_lines(text: str) -> str:
+    """``shown``, keeping the line breaks."""
+    return "\n".join(shown(line) for line in text.split("\n"))
+
+
+def _print_answer(result: Answer, out: TextIO, err: TextIO) -> int:
+    if result.not_found:
+        print("The answer is not in these documents.", file=out)
+        return 0
+    print(_shown_lines(result.text), file=out)
+    if result.citations:
+        print("\nSources:", file=out)
+    for c in result.citations:
+        where = page_ref(c.hit.page, shown(c.hit.label))
+        print(f"[{c.number}] {shown(source_name(c.hit))}  {where}", file=out)
+        if not c.quotes:
+            print("    no quote given", file=out)
+        if c.quote_on is not None:
+            elsewhere = page_ref(c.quote_on.page, shown(c.quote_on.label))
+            print(
+                f"    the quoted words are on {shown(source_name(c.quote_on))} {elsewhere};"
+                " the answer numbered its source wrongly",
+                file=out,
+            )
+        for q in c.quotes:
+            mark = "\u2713" if q.verified else f"\u2717 {q.reason}:"
+            print(f"    {mark} \u201c{shown(q.quote)}\u201d", file=out)
+    if result.dropped:
+        numbers = ", ".join(str(n) for n in result.dropped)
+        print(f"removed citations of pages the model was not given: {numbers}", file=err)
+    if not result.grounded:
+        print(
+            "ungrounded: no quote in this answer was found on its cited page; check it"
+            " against the documents",
+            file=err,
+        )
+        return 3
+    return 0
+
+
 def _as_pipe_error(exc: OSError) -> OSError:
     """On Windows a write to a pipe whose reader has gone fails with EINVAL, not EPIPE."""
     if sys.platform == "win32" and exc.errno == errno.EINVAL:
@@ -546,7 +747,13 @@ class _Stdout(io.TextIOBase):
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    commands = {"index": cmd_index, "docs": cmd_docs, "search": cmd_search, "eval": cmd_eval}
+    commands = {
+        "index": cmd_index,
+        "docs": cmd_docs,
+        "search": cmd_search,
+        "ask": cmd_ask,
+        "eval": cmd_eval,
+    }
     if args.command not in commands:
         build_parser().print_help(sys.stderr)
         return 2
