@@ -271,19 +271,32 @@ class Conversations:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._turns: OrderedDict[str, list[str]] = OrderedDict()
+        # A question askpdf answered with "which document do you mean?", per conversation.
+        self._unclear: dict[str, str] = {}
 
     def start(self) -> str:
         cid = secrets.token_urlsafe(16)
         with self._lock:
             self._turns[cid] = []
             while len(self._turns) > MAX_CONVERSATIONS:
-                self._turns.popitem(last=False)
+                old, _ = self._turns.popitem(last=False)
+                self._unclear.pop(old, None)
         return cid
 
     def earlier(self, cid: str) -> list[str] | None:
         with self._lock:
             turns = self._turns.get(cid)
             return None if turns is None else list(turns)
+
+    def ask_which(self, cid: str, question: str) -> None:
+        with self._lock:
+            if cid in self._turns:
+                self._unclear[cid] = question
+
+    def take_unclear(self, cid: str) -> str | None:
+        """The question waiting for its document; the next question always clears it."""
+        with self._lock:
+            return self._unclear.pop(cid, None)
 
     def add(self, cid: str, question: str) -> None:
         with self._lock:
@@ -449,9 +462,18 @@ def create_app(
             # Follow-ups are searched with the conversation's questions joined: the
             # "concat" condition of the conversation eval (design revision 3).
             query = " ".join([*earlier, question])
+            unclear = conversations.take_unclear(cid)
             lookup = find_page(question, snapshot, earlier)
+            if lookup is None and unclear is not None:
+                # Perhaps the reply to "which document do you mean?" ("naca", "the
+                # second one"): taken as such only if it completes the question.
+                retry = find_page(f"{unclear} {question}", snapshot, earlier)
+                if retry is not None and retry.hits:
+                    lookup, question = retry, f"{unclear} {question}"
             if lookup is not None and not lookup.hits:
                 # No such page, or which document is unclear: say so, without the model.
+                if lookup.which:
+                    conversations.ask_which(cid, question)
                 conversations.add(cid, question)
                 yield sse("final", {**NO_ANSWER, "message": lookup.notes[0]})
                 return

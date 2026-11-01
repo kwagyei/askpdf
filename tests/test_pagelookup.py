@@ -116,7 +116,7 @@ def test_the_list_of_documents_is_kept_short(tmp_path: Path) -> None:
             _put(store, f"doc{i}.pdf", str(i) * 64, {1: ("1", "text")})
         snapshot = Snapshot.load(store)
     lookup = find_page("what does page 1 say?", snapshot)
-    assert lookup is not None and lookup.notes[0].endswith(", …")
+    assert lookup is not None and lookup.notes[0].endswith(", …, or say \u201cthe second pdf\u201d")
     assert lookup.notes[0].count(".pdf") == SHOWN_NAMES
 
 
@@ -277,3 +277,39 @@ def test_ask_asks_which_document(folder: Path, capsys: pytest.CaptureFixture[str
     capsys.readouterr()
     assert main(_ask(folder, "what is on page 1?")) == 0
     assert capsys.readouterr().out.startswith("which document do you mean?")
+
+
+# --- documents by position ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("question", "path"),
+    [
+        # As the documents are listed: annual-report-2024, nist-sp-800-53, nist-sp-800-63b-4.
+        ("what is on page 1 of the first pdf?", "annual-report-2024.pdf"),
+        ("what is on page 1 of the second pdf?", "nist-sp-800-53.pdf"),
+        ("page 1 of the 3rd document", "nist-sp-800-63b-4.pdf"),
+        ("page 1 of the last file", "nist-sp-800-63b-4.pdf"),
+        ("page 1 of the second one", "nist-sp-800-53.pdf"),
+    ],
+)
+def test_a_document_can_be_named_by_its_position(
+    question: str, path: str, snapshot: Snapshot
+) -> None:
+    lookup = find_page(question, snapshot)
+    assert lookup is not None and lookup.hits[0].paths == (path,)
+
+
+def test_a_position_past_the_end_asks_which_document(snapshot: Snapshot) -> None:
+    lookup = find_page("page 1 of the ninth pdf", snapshot)
+    assert lookup is not None and lookup.which and lookup.hits == []
+
+
+def test_a_name_wins_over_a_position(snapshot: Snapshot) -> None:
+    lookup = find_page("page 1 of the second pdf, I mean the annual report", snapshot)
+    assert lookup is not None and lookup.hits[0].paths == ("annual-report-2024.pdf",)
+
+
+def test_only_the_which_question_is_marked_as_such(snapshot: Snapshot) -> None:
+    missing = find_page("page 99 of the annual report", snapshot)
+    assert missing is not None and not missing.which

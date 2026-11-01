@@ -39,9 +39,12 @@ _ORDINALS = (
     *("ninth", "tenth", "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth"),
     *("sixteenth", "seventeenth", "eighteenth", "nineteenth", "twentieth"),
 )
+_NTH = rf"(?:(?P<word>{'|'.join(_ORDINALS)}|last)|(?P<nth>\d{{1,4}})(?:st|nd|rd|th))"
+# "the second pdf", "the 3rd document", "the last file", "the second one"
+_NTH_DOCUMENT = re.compile(rf"\b{_NTH}\s+(?:pdf|document|doc|file|one)\b", re.I)
 # "the second line", "the 3rd line", "line 3", "the last line"
 _LINE = re.compile(
-    rf"\b(?:(?P<word>{'|'.join(_ORDINALS)}|last)|(?P<nth>\d{{1,4}})(?:st|nd|rd|th))\s+line\b"
+    rf"\b{_NTH}\s+line\b"
     r"|\bline\s+(?P<num>\d{1,4})\b",
     re.I,
 )
@@ -51,11 +54,20 @@ _LINE = re.compile(
 class Lookup:
     hits: list[PageHit]  # empty if the page does not exist or the document is unclear
     notes: tuple[str, ...]
+    which: bool = False  # True when asking which document was meant
     answer: Answer | None = None  # set when the page text answers it without the model
 
 
 def _words(text: str) -> list[str]:
     return _WORD.findall(unicodedata.normalize("NFKC", text).casefold())
+
+
+def _ordinal(match: re.Match[str]) -> int:
+    """1-based from "second" or "2nd"; -1 for "last" (Python's index of the last item)."""
+    if match.group("word"):
+        word = match.group("word").casefold()
+        return -1 if word == "last" else _ORDINALS.index(word) + 1
+    return int(match.group("nth"))
 
 
 def _matched_words(name: list[str], text: list[str]) -> int:
@@ -107,6 +119,12 @@ def _document(snapshot: Snapshot, texts: Sequence[str]) -> tuple[str | None, lis
             if len(best) == 1:
                 return best[0], []
             return None, best
+        nth = _NTH_DOCUMENT.search(text)
+        if nth is not None:  # "the second pdf": as the documents are listed, by path
+            listed = sorted(names, key=lambda sha: snapshot.paths[sha])
+            n = _ordinal(nth)
+            if n == -1 or 1 <= n <= len(listed):
+                return listed[n if n == -1 else n - 1], []
     return None, []
 
 
@@ -138,7 +156,10 @@ def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) ->
         if not names:
             return None  # nothing indexed: let the search say so
         listed = ", ".join(names[:SHOWN_NAMES]) + (", …" if len(names) > SHOWN_NAMES else "")
-        return Lookup([], (f"which document do you mean? Name it, e.g. {listed}",))
+        note = f"which document do you mean? Name it, e.g. {listed}"
+        if not tied:  # positions count the whole list, so offer them only for it
+            note += ", or say \u201cthe second pdf\u201d"
+        return Lookup([], (note,), which=True)
     name = PurePath(snapshot.paths[sha][0]).name
     pages = sorted(page for (s, page) in snapshot.labels if s == sha)
     wanted = match.group("n").casefold()
@@ -165,10 +186,7 @@ def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) ->
 
 def _line_number(match: re.Match[str]) -> int:
     """1-based, or -1 for the last line."""
-    if match.group("word"):
-        word = match.group("word").casefold()
-        return -1 if word == "last" else _ORDINALS.index(word) + 1
-    return int(match.group("nth") or match.group("num"))
+    return int(match.group("num")) if match.group("num") else _ordinal(match)
 
 
 def _read_line(match: re.Match[str], hits: list[PageHit], snapshot: Snapshot, name: str) -> Lookup:
@@ -202,4 +220,4 @@ def _read_line(match: re.Match[str], hits: list[PageHit], snapshot: Snapshot, na
         supported=len(citations),
         raw="",
     )
-    return Lookup(hits, (f"read from {name} without the model",), answer)
+    return Lookup(hits, (f"read from {name} without the model",), answer=answer)

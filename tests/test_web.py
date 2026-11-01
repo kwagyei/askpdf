@@ -797,3 +797,43 @@ def test_a_follow_up_page_keeps_the_document(folder: Path) -> None:
         _ask(client, "what is on page 1 of policy.pdf", cid)
         events = _events(_ask(client, "and page 2?", cid).text)
     assert events[0][1]["notes"] == ["reading policy.pdf page 2 directly"]
+
+
+def _two_documents(folder: Path) -> None:
+    make_pdf(folder / "zeta-notes.pdf", [text_page("Zeta notes about tunnels and wings.")])
+    assert main(["index", str(folder), "--index", str(folder.parent / "i.db")]) == 0
+
+
+def test_a_reply_naming_the_document_completes_the_unclear_question(folder: Path) -> None:
+    _two_documents(folder)
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        cid = _conversation(client)
+        asked = _events(_ask(client, "what is on page 2?", cid).text)
+        assert asked[0][1]["message"].startswith("which document do you mean?")
+        events = _events(_ask(client, "policy", cid).text)
+    assert events[0][1]["notes"] == ["reading policy.pdf page 2 directly"]
+    assert chat.users[0].endswith("Question: what is on page 2? policy")
+
+
+def test_a_reply_by_position_completes_it_too(folder: Path) -> None:
+    _two_documents(folder)
+    with _client(_app(folder)) as client:
+        cid = _conversation(client)
+        _ask(client, "what is the first line of page 1?", cid)
+        events = _events(_ask(client, "the second one", cid).text)
+    assert events[-1][1]["text"].startswith("Line 1 of page 1 reads: “Zeta notes")
+
+
+def test_an_unrelated_next_question_is_answered_as_itself(folder: Path) -> None:
+    _two_documents(folder)
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        cid = _conversation(client)
+        _ask(client, "what is on page 2?", cid)
+        events = _events(_ask(client, "how many characters do passwords need", cid).text)
+        # The open question is dropped after one reply, matched or not.
+        again = _events(_ask(client, "policy", cid).text)
+    assert [n for n, _ in events][-1] == "final" and "message" not in events[-1][1]
+    assert chat.users[0].endswith("Question: how many characters do passwords need")
+    assert all(d.get("used") != "page" for n, d in again if n == "search")
