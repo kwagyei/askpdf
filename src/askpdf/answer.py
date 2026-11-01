@@ -200,8 +200,11 @@ def _quotes(section: str) -> dict[int, list[str]]:
             continue
         # Quote marks, and punctuation at either end, are not part of the quoted words.
         text = match.group(2).strip().strip(_WRAPPING + ".,;:\u2026 \t")
-        if text:
-            found.setdefault(_number(match.group(1)), []).append(text)
+        if not text:
+            continue
+        quotes = found.setdefault(_number(match.group(1)), [])
+        if text not in quotes:  # a small model often repeats a quote line
+            quotes.append(text)
     return found
 
 

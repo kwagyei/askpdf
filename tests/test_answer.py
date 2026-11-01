@@ -365,3 +365,9 @@ def test_ask_names_the_page_a_misnumbered_quote_is_on(
         assert main(_ask(folder, "passwords characters cookies")) == 3
     out = capsys.readouterr().out
     assert "the quoted words are on policy.pdf page 2" in out
+
+
+def test_a_repeated_quote_is_checked_and_shown_once() -> None:
+    quote = '"Passwords SHALL be at least fifteen characters long"'
+    result = parse(f"Long [1].\nQuotes:\n[1] {quote}\n[1] {quote}\n[1] {quote}", HITS, TEXTS)
+    assert len(result.citations[0].quotes) == 1 and result.grounded
