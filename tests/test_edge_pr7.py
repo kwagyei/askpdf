@@ -254,7 +254,9 @@ def test_hostile_replies_parse_in_linear_time() -> None:
     start = time.perf_counter()
     for raw in replies:
         parse(raw, HITS, TEXTS)
-    assert time.perf_counter() - start < 2.0
+    # About 1 s when linear; a quadratic pass at n = 50,000 takes minutes. The margin is
+    # wide because a 2 s limit failed under parallel load with Ollama busy.
+    assert time.perf_counter() - start < 10.0
 
 
 def test_a_whitespace_run_inside_a_quote_line_is_not_quadratic() -> None:
