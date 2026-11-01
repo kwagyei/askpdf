@@ -47,9 +47,9 @@ from askpdf.retrieve import (
     RETRIEVERS,
     RRF_K,
     PageHit,
+    Search,
+    search,
     search_bm25,
-    search_dense,
-    search_hybrid,
 )
 from askpdf.snapshot import Snapshot
 from askpdf.store import (
@@ -137,6 +137,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     with_target(serve)
     with_model(serve)
+    serve.add_argument(
+        "--retriever",
+        choices=list(RETRIEVERS),
+        default=DEFAULT_RETRIEVER,
+        help=f"ranking method (default: {DEFAULT_RETRIEVER}; dense and hybrid embed the"
+        " folder with Ollama and fall back to keywords without it)",
+    )
     serve.add_argument(
         "--port", type=_port, metavar="N", help="port on 127.0.0.1 (default: first free from 8765)"
     )
@@ -632,30 +639,20 @@ def cmd_search(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 def _search(args: argparse.Namespace, snapshot: Snapshot, err: TextIO) -> tuple[list[PageHit], str]:
     """Search with the chosen retriever, falling back to keywords when vectors are
     missing; return the hits and the retriever actually used."""
+    embed = None
     if args.retriever != "bm25":
-        if not snapshot.embedded.any():
-            print(
-                "no usable semantic index (Ollama was not running when the folder was indexed,"
-                " or the embedding model changed); using keyword search",
-                file=err,
-            )
-        else:
-            try:
-                query = _embedder(args).embed_query(args.question)
-                if not snapshot.fully_embedded:
-                    print("some chunks are not embedded yet; run index to finish", file=err)
-                if args.retriever == "dense":
-                    return search_dense(snapshot, query, args.k), "dense"
-                return search_hybrid(snapshot, args.question, query, args.k), "hybrid"
-            except http.ProviderError as exc:
-                print(f"{shown(str(exc))}; using keyword search", file=err)
-            except ValueError:  # the query vector's size does not match the index
-                print(
-                    "the embedding model changed since this folder was indexed; using keyword"
-                    f" search. Delete {_index_path(args)} and index again to fix it.",
-                    file=err,
-                )
-    return search_bm25(snapshot, args.question, args.k), "bm25"
+        try:
+            embed = _embedder(args).embed_query
+        except http.ProviderError as exc:
+            print(f"{shown(str(exc))}; using keyword search", file=err)
+    result = search(snapshot, args.question, args.k, args.retriever, embed)
+    for note in result.notes:
+        if note.startswith("some chunks"):
+            note += "; run index to finish"
+        elif note.startswith("the embedding model changed"):
+            note += f". Delete {_index_path(args)} and index again to fix it."
+        print(shown(note), file=err)
+    return result.hits, result.used
 
 
 def _chat(args: argparse.Namespace) -> ChatModel:
@@ -742,6 +739,9 @@ def _index_in_background(args: argparse.Namespace, err: TextIO) -> Callable[["Pr
                 report = index_folder(
                     args.path, store, PypdfExtractor(), ChunkParams(), on_file=on_file
                 )
+                if args.retriever != "bm25":
+                    progress.update(current="", message="embedding for search by meaning")
+                    _embed(args, store, err)  # says so and carries on if Ollama is down
         except (WrongFolderError, OSError, sqlite3.Error) as exc:
             print(f"askpdf: indexing failed: {shown(str(exc))}", file=err)
             progress.update(state="failed", current="", message=str(exc))
@@ -751,6 +751,18 @@ def _index_in_background(args: argparse.Namespace, err: TextIO) -> Callable[["Pr
         progress.update(state="ready", current="", done=len(report.added))
 
     return run
+
+
+def _retriever(args: argparse.Namespace) -> Callable[[Snapshot, str, int], Search]:
+    """The web app's search: the chosen retriever, with the same fallbacks as the CLI."""
+    embed = None
+    if args.retriever != "bm25":
+        embed = _embedder(args).embed_query  # the remote check already passed in _chat
+
+    def retrieve(snapshot: Snapshot, question: str, k: int) -> Search:
+        return search(snapshot, question, k, args.retriever, embed)
+
+    return retrieve
 
 
 def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
@@ -790,6 +802,7 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         port=port,
         token=token,
         chat_for=lambda question, hits, texts: sized(chat, question, hits, texts),
+        retrieve=_retriever(args),
         index_folder=_index_in_background(args, err),
         on_start=started,
     )

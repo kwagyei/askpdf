@@ -233,7 +233,8 @@ async function ask(question) {
     for await (const { name, data } of events(response)) {
       if (name === "search") {
         const note = turn.querySelector(".searched");
-        note.textContent = `Searched for: ${data.query}`;
+        const parts = data.query ? [`Searched for: ${data.query}`] : [];
+        note.textContent = [...parts, ...data.notes].join(" · ");
         note.hidden = false;
       } else if (name === "pages") {
         showPages(turn, data.pages);

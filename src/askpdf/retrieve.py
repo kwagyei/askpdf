@@ -5,12 +5,14 @@ ranking is collapsed to pages: a page scores as its best chunk. Ties are broken 
 chunk id, so the same index and question always give the same order.
 """
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
 
 from askpdf.bm25 import tokenize
+from askpdf.providers.http import ProviderError
 from askpdf.snapshot import Chunk, Snapshot
 
 DEFAULT_K = 5  # provisional; k is chosen on the dev split in PR 6 (ADR-0004)
@@ -119,3 +121,42 @@ def search_hybrid(
         scores[i] = value
     order = _ranked(candidates, scores)
     return _pages(snapshot, order, scores[order], k)
+
+
+@dataclass(frozen=True, slots=True)
+class Search:
+    hits: list[PageHit]
+    used: str  # the retriever actually used, after any fallback
+    notes: tuple[str, ...] = field(default=())  # why it fell back, or what is incomplete
+
+
+def search(
+    snapshot: Snapshot,
+    question: str,
+    k: int = DEFAULT_K,
+    retriever: str = DEFAULT_RETRIEVER,
+    embed: Callable[[str], npt.NDArray[np.float32]] | None = None,
+) -> Search:
+    """Search with ``retriever``, falling back to keywords whenever meaning cannot be used:
+    no vectors in the index, no embedder, the model unreachable, or vectors from another
+    embedding model. The CLI prints the notes; the web app shows them under the question."""
+    if retriever == "bm25":
+        return Search(search_bm25(snapshot, question, k), "bm25")
+    fallback = "using keyword search"
+    if embed is None or not snapshot.embedded.any():
+        note = (
+            "no usable semantic index (Ollama was not running when the folder was indexed,"
+            f" or the embedding model changed); {fallback}"
+        )
+        return Search(search_bm25(snapshot, question, k), "bm25", (note,))
+    try:
+        query = embed(question)
+        notes = () if snapshot.fully_embedded else ("some chunks are not embedded yet",)
+        if retriever == "dense":
+            return Search(search_dense(snapshot, query, k), "dense", notes)
+        return Search(search_hybrid(snapshot, question, query, k), "hybrid", notes)
+    except ProviderError as exc:
+        note = f"{exc}; {fallback}"
+    except ValueError:  # the query vector's size does not match the index
+        note = f"the embedding model changed since this folder was indexed; {fallback}"
+    return Search(search_bm25(snapshot, question, k), "bm25", (note,))

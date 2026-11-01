@@ -9,9 +9,10 @@ import pytest
 
 from askpdf.cli import main
 from askpdf.indexer import embed_missing
+from askpdf.providers import http
 from askpdf.providers.base import Matrix, normalise
 from askpdf.providers.ollama import OllamaEmbedder
-from askpdf.retrieve import search_bm25, search_dense, search_hybrid
+from askpdf.retrieve import search, search_bm25, search_dense, search_hybrid
 from askpdf.snapshot import Snapshot
 from askpdf.store import ChunkRecord, FileRow, PageRecord, Store
 from tests.fake_models import fake_model_server, fake_vector
@@ -166,3 +167,55 @@ def test_the_embedder_is_pinned(folder: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(indexer.pins, "__defaults__", ("ollama/another-model",))
     assert main(_search(folder)) == 1  # built with other settings
     assert isinstance(OllamaEmbedder().name, str)
+
+
+# --- search(): the chosen retriever with its fallbacks --------------------------------------
+
+
+def _query(text: str) -> "np.typing.NDArray[np.float32]":
+    return WordEmbedder().embed_query(text)
+
+
+def test_search_uses_the_chosen_retriever_when_it_can(store: Store) -> None:
+    embed_missing(store, WordEmbedder())
+    snapshot = Snapshot.load(store)
+    result = search(snapshot, "apple", 2, "hybrid", _query)
+    assert result.used == "hybrid" and result.notes == ()
+    assert result.hits == search_hybrid(snapshot, "apple", _query("apple"), 2)
+    assert search(snapshot, "apple", 2, "dense", _query).used == "dense"
+    assert search(snapshot, "apple", 2, "bm25", _query).used == "bm25"
+
+
+@pytest.mark.parametrize("retriever", ["dense", "hybrid"])
+def test_without_vectors_or_an_embedder_search_falls_back_to_keywords(
+    store: Store, retriever: str
+) -> None:
+    bare = Snapshot.load(store)
+    result = search(bare, "apple", 2, retriever, _query)
+    assert result.used == "bm25" and "no usable semantic index" in result.notes[0]
+    assert result.hits == search_bm25(bare, "apple", 2)
+    embed_missing(store, WordEmbedder())
+    assert search(Snapshot.load(store), "apple", 2, retriever, None).used == "bm25"
+
+
+def test_an_unreachable_embedder_falls_back_with_the_reason(store: Store) -> None:
+    embed_missing(store, WordEmbedder())
+
+    def down(text: str) -> "np.typing.NDArray[np.float32]":
+        raise http.UnreachableError("cannot reach Ollama")
+
+    result = search(Snapshot.load(store), "apple", 2, "hybrid", down)
+    assert result.used == "bm25" and result.notes == ("cannot reach Ollama; using keyword search",)
+
+
+def test_vectors_from_another_model_fall_back(store: Store) -> None:
+    embed_missing(store, WordEmbedder())
+    result = search(Snapshot.load(store), "apple", 2, "dense", lambda t: np.ones(8, np.float32))
+    assert result.used == "bm25" and "embedding model changed" in result.notes[0]
+
+
+def test_a_partly_embedded_index_is_searched_with_a_note(store: Store) -> None:
+    first = store.chunks_without_vectors()[0]
+    store.put_vectors([(first[0], normalise([fake_vector("apple banana")]).reshape(-1).tobytes())])
+    result = search(Snapshot.load(store), "apple", 2, "hybrid", _query)
+    assert result.used == "hybrid" and result.notes == ("some chunks are not embedded yet",)

@@ -85,7 +85,9 @@ opens a page on `127.0.0.1`. The pages being read appear as soon as they are fou
 answer streams in while the model writes, and the checked version then replaces it: each
 `[n]` links to its PDF, opened at the cited page, and each quote shows ✓ or why it failed.
 A follow-up question is searched together with the conversation's earlier questions (up
-to three in all), and the page shows what was searched for.
+to three in all), and the page shows what was searched for. Search is by keyword unless you
+start it with `--retriever hybrid` (or `dense`), which also embeds the folder with Ollama
+and falls back to keywords, saying why, whenever that is not possible.
 
 The server is local, but other websites open in the same browser can still send it
 requests, so it guards against that:
@@ -233,9 +235,9 @@ listed in `eval/corpus/SOURCES.md`.
   0.500 against 0.429 as typed on 14 development follow-ups, though the intervals
   overlap), but a question such as "is it applied before hashing?" is still answered
   without knowing what "it" is.
-- The web app answers one question at a time, searches by keyword only, and indexes the
-  folder once when it starts; files added later are found after a restart (watching the
-  folder is the next pull request).
+- The web app answers one question at a time and indexes the folder once when it starts;
+  files added later are found after a restart (watching the folder is the next pull
+  request). It searches by keyword unless started with `--retriever`.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
   2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about

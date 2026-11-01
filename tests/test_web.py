@@ -16,7 +16,8 @@ from askpdf import cli
 from askpdf.cli import build_parser, free_port, main
 from askpdf.providers import http
 from askpdf.providers.base import ChatModel
-from askpdf.retrieve import PageHit
+from askpdf.retrieve import PageHit, Search, search
+from askpdf.snapshot import Snapshot
 from askpdf.store import FileRow, Store
 from askpdf.web.app import (
     CSP,
@@ -28,6 +29,7 @@ from askpdf.web.app import (
     cookie_name,
     create_app,
 )
+from tests.fake_models import fake_model_server
 from tests.pdfs import make_pdf, text_page
 
 PORT = 8765
@@ -689,3 +691,50 @@ def test_every_unsafe_method_needs_the_origin(client: TestClient, method: str) -
     # With the right origin it only reaches the router, which has no such route.
     response = client.request(method, "/api/conversations", headers={"Origin": BASE})
     assert response.status_code == 405
+
+
+# --- search by meaning ----------------------------------------------------------------------
+
+
+def test_search_notes_are_shown_even_on_a_first_question(folder: Path) -> None:
+    def keyword_only(snapshot: Snapshot, question: str, k: int) -> Search:
+        hits = search(snapshot, question, k)
+        return Search(hits.hits, "bm25", ("cannot reach Ollama; using keyword search",))
+
+    with _client(_app(folder, retrieve=keyword_only)) as client:
+        events = _events(_ask(client, "passwords").text)
+    assert events[0] == (
+        "search",
+        {"query": None, "used": "bm25", "notes": ["cannot reach Ollama; using keyword search"]},
+    )
+    assert [name for name, _ in events[1:]] == ["pages", "token", "final"]
+
+
+def test_serve_with_hybrid_embeds_the_folder_and_searches_by_meaning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make_pdf(tmp_path / "g" / "a.pdf", [text_page("Langley tested the transonic wing.")])
+    index = tmp_path / "j.db"
+    Store(index).close()
+    with fake_model_server() as (url, _):
+        monkeypatch.setenv("ASKPDF_OLLAMA_URL", url)
+        args = build_parser().parse_args(
+            ["serve", str(tmp_path / "g"), "--index", str(index), "--retriever", "hybrid"]
+        )
+        with open(os.devnull, "w") as errors:
+            progress = Progress()
+            cli._index_in_background(args, errors)(progress)
+        assert progress.state == "ready"
+        with Store(index) as store:
+            snapshot = Snapshot.load(store)
+        assert snapshot.fully_embedded
+        assert cli._retriever(args)(snapshot, "wing tests", 3).used == "hybrid"
+    # With Ollama gone, the same search falls back to keywords and says why.
+    monkeypatch.setenv("ASKPDF_OLLAMA_URL", "http://127.0.0.1:9")
+    result = cli._retriever(args)(snapshot, "wing tests", 3)
+    assert result.used == "bm25" and "using keyword search" in result.notes[0]
+
+
+def test_serve_defaults_to_keyword_search(tmp_path: Path) -> None:
+    args = build_parser().parse_args(["serve", str(tmp_path)])
+    assert args.retriever == "bm25"

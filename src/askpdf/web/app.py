@@ -44,7 +44,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from askpdf.answer import ANSWER_K, Answer, Final, Pages, Token, answer, source_name
 from askpdf.providers import http
 from askpdf.providers.base import ChatModel
-from askpdf.retrieve import PageHit, search_bm25
+from askpdf.retrieve import PageHit, Search, search
 from askpdf.snapshot import Snapshot
 from askpdf.store import Store
 
@@ -352,6 +352,7 @@ def create_app(
     port: int,
     token: str,
     chat_for: ChatFor,
+    retrieve: Callable[[Snapshot, str, int], Search] = search,
     index_folder: Callable[[Progress], None] | None = None,
     on_start: Callable[[], None] | None = None,
     k: int = ANSWER_K,
@@ -444,9 +445,12 @@ def create_app(
             # Follow-ups are searched with the conversation's questions joined: the
             # "concat" condition of the conversation eval (design revision 3).
             query = " ".join([*earlier, question])
-            if earlier:
-                yield sse("search", {"query": query})
-            hits = search_bm25(snapshot, query, k)
+            found = retrieve(snapshot, query, k)
+            if earlier or found.notes:
+                # The query is shown only for follow-ups, where it differs from the question.
+                shown = query if earlier else None
+                yield sse("search", {"query": shown, "used": found.used, "notes": [*found.notes]})
+            hits = found.hits
             chat = chat_for(question, hits, snapshot.texts)
             for event in answer(question, hits, snapshot.texts, chat):
                 if isinstance(event, Pages):
