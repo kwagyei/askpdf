@@ -8,9 +8,10 @@ page. It runs locally with [Ollama](https://ollama.com); nothing leaves your mac
 you opt in to a remote model.
 
 > **Work in progress.** The design is settled and the code arrives through pull requests.
-> What works today, from the command line: reading a folder of PDFs into a local index,
-> searching it by keyword (BM25) or by meaning (embeddings from a local model), and
-> answering questions with checked citations. The web app comes next.
+> What works today: reading a folder of PDFs into a local index, searching it by keyword
+> (BM25) or by meaning (embeddings from a local model), and answering questions with
+> checked citations, in the browser or from the command line. Watching the folder for
+> changes comes next.
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -76,6 +77,67 @@ Sources:
 The answer is right (page 26 names NFC), but only one of its three quotes checks out: the
 other two are real sentences from page 26, filed under the wrong number. That is typical
 of the 3B model, and the results below count it.
+
+### Questions about a page or a line
+
+Search finds pages by their words, but "page 5 of report.pdf" is not a phrase on any page.
+So a question that names a page is answered from that page directly, both in `ask` and in
+the browser:
+
+- The document is matched by its file name, in any case, with or without `.pdf`, and with
+  spaces for dashes. Most of a long name ("NIST SP 800-63B") or one word that only one
+  file has ("the naca report") is enough. A folder of one PDF needs no name. A follow-up
+  ("and page 6?") keeps the document of the earlier question. If the name is missing or
+  fits several files, askpdf asks which one.
+- "Page 5" can mean the fifth page of the file or the page printed "5". When those differ,
+  both are read and the citation shows which one the answer came from. "PDF page 5" means
+  the fifth page of the file only.
+- A page that does not exist gets a plain reply ("report.pdf has no page 99 (12 pages)").
+- A question about a line ("what is the second line on page 4 of the naca report?") is
+  answered without the model at all: the line is read from the page's stored text and
+  cited like any quote. Lines are counted as the PDF's text layer gives them, blank lines
+  skipped, so a running header counts as a line and columns may not read in the order
+  they look.
+- A request to summarise a whole document or chapter gets a plain reply saying askpdf
+  cannot do that yet, with a suggestion that works ("summarise page 12 of …"), rather
+  than a summary of the few pages a search happened to find. A summary of a topic
+  ("summarise what it says about passwords") is searched as usual.
+
+### In the browser
+
+`askpdf FOLDER` (short for `askpdf serve FOLDER`) indexes the folder in the background and
+opens a page on `127.0.0.1`. The pages being read appear as soon as they are found, the
+answer streams in while the model writes, and the checked version then replaces it: each
+`[n]` links to its PDF, opened at the cited page, and each quote shows ✓ or why it failed.
+A follow-up question is searched together with the conversation's earlier questions (up
+to three in all), and the page shows what was searched for. Search is by keyword unless you
+start it with `--retriever hybrid` (or `dense`), which also embeds the folder with Ollama
+and falls back to keywords, saying why, whenever that is not possible.
+
+The server is local, but other websites open in the same browser can still send it
+requests, so it guards against that:
+
+- It listens on 127.0.0.1 only, with no option to change it, and refuses any `Host` header
+  but its own (against DNS rebinding).
+- The link printed in the terminal carries a one-time key, which the page swaps for an
+  HttpOnly, SameSite=Strict cookie. Without that cookie the API and the PDFs answer 403.
+- A request that can change anything (any method but GET, HEAD and OPTIONS) must come
+  from the page's own origin.
+- A PDF is requested by the number of its row in the index, never by a path. Before it is
+  sent, the file is resolved again and must still be a regular `.pdf` inside the folder,
+  so a file swapped for a symlink after indexing is refused.
+- Every response carries a Content Security Policy that allows no inline script, and model
+  and PDF text is inserted as text, never as HTML.
+
+Each of these has a test (`tests/test_web.py`).
+
+Whether the browser's own PDF viewer honours `#page=N` is checked by hand:
+
+| Browser | Opens at the cited page? |
+| --- | --- |
+| Chrome | not checked yet |
+| Safari | not checked yet |
+| Firefox | not checked yet |
 
 ## What makes it different
 
@@ -193,7 +255,16 @@ listed in `eval/corpus/SOURCES.md`.
 - Whether an answer is *correct* is not measured yet; the checks above show that quoted
   words are on the cited page, not that the answer is right. People label a sample of
   answers at release.
-- The answer model sees only the question and the retrieved pages, not earlier turns.
+- The answer model sees only the question and the retrieved pages, not earlier turns. A
+  follow-up is searched with the earlier questions joined, which helps retrieval (hit@1
+  0.500 against 0.429 as typed on 14 development follow-ups, though the intervals
+  overlap), but a question such as "is it applied before hashing?" is still answered
+  without knowing what "it" is.
+- No summaries of whole documents or chapters: answers come from 3 pages, and askpdf
+  does not read a PDF's table of contents. Such requests are declined plainly.
+- The web app answers one question at a time and indexes the folder once when it starts;
+  files added later are found after a restart (watching the folder is the next pull
+  request). It searches by keyword unless started with `--retriever`.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
   2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about

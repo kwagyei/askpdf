@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>askpdf</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <h1>askpdf</h1>
+      <span id="folder" class="muted"></span>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">Loading…</p>
+    <button id="new-chat" type="button" class="quiet">New chat</button>
+  </header>
+
+  <main>
+    <details id="library" class="library">
+      <summary>Documents <span id="doc-count" class="muted"></span></summary>
+      <ul id="docs"></ul>
+      <ul id="failed" class="failed"></ul>
+    </details>
+
+    <section id="log" class="log" aria-live="polite">
+      <p id="empty" class="empty">
+        Ask a question about the PDFs in this folder. Answers cite the page they come from,
+        and every quote is checked word for word against that page.
+      </p>
+    </section>
+  </main>
+
+  <form id="ask" class="ask">
+    <label for="question" class="visually-hidden">Question</label>
+    <textarea id="question" name="question" rows="2" maxlength="2000" required
+              placeholder="Ask about your documents…"></textarea>
+    <button id="send" type="submit">Ask</button>
+  </form>
+
+  <template id="turn">
+    <article class="turn">
+      <h2 class="question"></h2>
+      <p class="searched muted" hidden></p>
+      <details class="pages" hidden>
+        <summary></summary>
+        <ol></ol>
+      </details>
+      <p class="waiting muted" hidden></p>
+      <div class="raw" hidden></div>
+      <div class="result" hidden></div>
+    </article>
+  </template>
+</body>
+</html>

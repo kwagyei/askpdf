@@ -368,11 +368,9 @@
           "verified": false,
           "needed_folding": false,
           "quotes": [
-            "Key exportability is prohibited",
             "Key exportability is prohibited"
           ],
           "reasons": [
-            "shorter than 5 words",
             "shorter than 5 words"
           ],
           "quote_on": null
