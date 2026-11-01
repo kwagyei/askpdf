@@ -3,7 +3,7 @@
 Results go to stdout and progress to stderr, so output can be piped. Exit codes:
 0 success, 1 a run-time problem (missing folder, unusable or busy index, no model), 2 bad
 options, 3 an answer none of whose quotes was found on its cited page, 130 interrupted.
-The remaining subcommands (serve, bench) arrive in later pull requests.
+`askpdf FOLDER` is short for `askpdf serve FOLDER`. `bench` arrives in a later pull request.
 """
 
 import argparse
@@ -12,13 +12,16 @@ import io
 import json
 import os
 import re
+import secrets
+import socket
 import sqlite3
 import sys
 import unicodedata
-from collections.abc import Sequence
+import webbrowser
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 from askpdf import __version__
 from askpdf.answer import (
@@ -58,6 +61,9 @@ from askpdf.store import (
     folder_key,
 )
 
+if TYPE_CHECKING:
+    from askpdf.web.app import Progress  # imported only by serve, at run time
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -79,6 +85,17 @@ def build_parser() -> argparse.ArgumentParser:
             type=Path,
             metavar="PATH",
             help="index file to use (default: one per folder in your cache directory)",
+        )
+
+    def with_model(sub: argparse.ArgumentParser) -> None:
+        sub.add_argument(
+            "--model", metavar="NAME", help=f"chat model (default: Ollama's {ollama.CHAT_MODEL})"
+        )
+        sub.add_argument(
+            "--api-url",
+            metavar="URL",
+            help="an OpenAI-compatible endpoint (e.g. https://host/v1) instead of Ollama;"
+            " the key is read from ASKPDF_API_KEY",
         )
 
     with_target(commands.add_parser("index", help="read new or changed PDFs into the index"))
@@ -114,14 +131,17 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument(
         "--show-context", action="store_true", help="print the pages given to the model"
     )
-    ask.add_argument(
-        "--model", metavar="NAME", help=f"chat model (default: Ollama's {ollama.CHAT_MODEL})"
+    with_model(ask)
+    serve = commands.add_parser(
+        "serve", help="open the web app for a folder (the default: askpdf FOLDER)"
     )
-    ask.add_argument(
-        "--api-url",
-        metavar="URL",
-        help="an OpenAI-compatible endpoint (e.g. https://host/v1) instead of Ollama;"
-        " the key is read from ASKPDF_API_KEY",
+    with_target(serve)
+    with_model(serve)
+    serve.add_argument(
+        "--port", type=_port, metavar="N", help="port on 127.0.0.1 (default: first free from 8765)"
+    )
+    serve.add_argument(
+        "--no-browser", action="store_true", help="print the link instead of opening it"
     )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
     evaluate.add_argument("stage", choices=["extraction", "retrieval", "conversation", "answers"])
@@ -153,6 +173,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _port(text: str) -> int:
+    value = _positive(text)
+    if value > 65535:
+        raise argparse.ArgumentTypeError(f"{text} is not a port number")
+    return value
 
 
 def _positive(text: str) -> int:
@@ -642,6 +669,19 @@ def _chat(args: argparse.Namespace) -> ChatModel:
     return ollama.OllamaChat(url, args.model or ollama.CHAT_MODEL)
 
 
+def sized(
+    chat: ChatModel,
+    question: str,
+    hits: Sequence[PageHit],
+    texts: Mapping[tuple[str, int], str],
+) -> ChatModel:
+    """Ollama's context window sized to this prompt; other endpoints manage their own."""
+    if isinstance(chat, ollama.OllamaChat):
+        prompt = build_prompt(question, hits, texts)
+        return replace(chat, num_ctx=context_window(prompt, chat.max_tokens))
+    return chat
+
+
 def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     snapshot = _load_snapshot(args, err)
     if snapshot is None:
@@ -651,9 +691,7 @@ def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     except http.ProviderError as exc:
         return _error(err, exc)
     hits, _ = _search(args, snapshot, err)
-    if isinstance(chat, ollama.OllamaChat):
-        prompt = build_prompt(args.question, hits, snapshot.texts)
-        chat = replace(chat, num_ctx=context_window(prompt, chat.max_tokens))
+    chat = sized(chat, args.question, hits, snapshot.texts)
     final: Answer | None = None
     try:
         for event in answer(args.question, hits, snapshot.texts, chat):
@@ -673,6 +711,93 @@ def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     if final is None:  # answer() always ends with Final; this is for the type checker
         return _error(err, "the answer did not finish")
     return _print_answer(final, out, err)
+
+
+FIRST_PORT = 8765
+
+
+def free_port(first: int = FIRST_PORT, tries: int = 50) -> int | None:
+    for port in range(first, first + tries):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            try:
+                probe.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    return None
+
+
+def _index_in_background(args: argparse.Namespace, err: TextIO) -> Callable[["Progress"], None]:
+    def run(progress: "Progress") -> None:
+        done = 0
+
+        def on_file(rel: str) -> None:
+            nonlocal done
+            progress.update(current=rel, done=done)
+            done += 1
+
+        try:
+            # Its own connection: SQLite connections stay in the thread that made them.
+            with Store(_index_path(args)) as store:
+                report = index_folder(
+                    args.path, store, PypdfExtractor(), ChunkParams(), on_file=on_file
+                )
+        except (WrongFolderError, OSError, sqlite3.Error) as exc:
+            print(f"askpdf: indexing failed: {shown(str(exc))}", file=err)
+            progress.update(state="failed", current="", message=str(exc))
+            return
+        for rel, reason in sorted(report.failed.items()):
+            print(f"failed: {shown(rel)}: {shown(reason)}", file=err)
+        progress.update(state="ready", current="", done=len(report.added))
+
+    return run
+
+
+def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    import uvicorn  # only the web app needs the server
+
+    from askpdf.web.app import create_app
+
+    if not args.path.is_dir():
+        return _error(err, f"{args.path} is not a folder")
+    try:
+        chat = _chat(args)
+    except http.ProviderError as exc:
+        return _error(err, exc)
+    store = _open_store(args, err)  # creates the index, so readers find one
+    if store is None:
+        return 1
+    with store:
+        try:
+            store.check_folder(folder_key(args.path))
+        except WrongFolderError as exc:
+            return _error(err, f"{exc}; pass a different --index")
+    port = args.port or free_port()
+    if port is None:
+        return _error(err, f"no free port from {FIRST_PORT}; pass --port")
+    token = secrets.token_urlsafe(32)
+    url = f"http://127.0.0.1:{port}/?token={token}"
+
+    def started() -> None:
+        print(f"askpdf is running at {url}", file=out, flush=True)
+        print("press Ctrl-C to stop", file=err, flush=True)
+        if not args.no_browser:
+            webbrowser.open(url)
+
+    app = create_app(
+        root=args.path,
+        index=_index_path(args),
+        port=port,
+        token=token,
+        chat_for=lambda question, hits, texts: sized(chat, question, hits, texts),
+        index_folder=_index_in_background(args, err),
+        on_start=started,
+    )
+    # 127.0.0.1 only, with no option to change it (ADR-0008).
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    server.run()
+    return 0 if server.started else _error(err, f"could not listen on port {port}")
 
 
 def _shown_lines(text: str) -> str:
@@ -746,14 +871,18 @@ class _Stdout(io.TextIOBase):
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    argv = list(sys.argv[1:] if argv is None else argv)
     commands = {
         "index": cmd_index,
         "docs": cmd_docs,
         "search": cmd_search,
         "ask": cmd_ask,
         "eval": cmd_eval,
+        "serve": cmd_serve,
     }
+    if argv and argv[0] not in commands and not argv[0].startswith("-"):
+        argv.insert(0, "serve")  # `askpdf FOLDER` opens the web app
+    args = build_parser().parse_args(argv)
     if args.command not in commands:
         build_parser().print_help(sys.stderr)
         return 2

@@ -353,6 +353,19 @@ class Store:
         ).fetchone()
         return None if row is None else FileRow(*row)
 
+    def file_ids(self) -> dict[str, int]:
+        """Path -> id of every indexed file. The web app links to ``/pdf/{id}``, so no
+        request ever carries a path. An id survives re-indexing the same path; after a
+        delete, the id of the newest row may be given to the next new file."""
+        return dict(self._db.execute("SELECT path, rowid FROM files WHERE status = 'indexed'"))
+
+    def file_path(self, file_id: int) -> str | None:
+        """The relative path of an indexed file, by its id."""
+        row = self._db.execute(
+            "SELECT path FROM files WHERE rowid = ? AND status = 'indexed'", (file_id,)
+        ).fetchone()
+        return None if row is None else str(row[0])
+
     def has_document(self, sha256: str) -> bool:
         query = "SELECT 1 FROM documents WHERE sha256 = ?"
         return self._db.execute(query, (sha256,)).fetchone() is not None
