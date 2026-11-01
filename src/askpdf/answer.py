@@ -131,10 +131,15 @@ def answer(
     hits: Sequence[PageHit],
     texts: Mapping[tuple[str, int], str],
     chat: ChatModel,
+    direct: "Answer | None" = None,
 ) -> Iterator[Event]:
-    """Retrieved pages in, events out. With no pages the model is not asked at all."""
+    """Retrieved pages in, events out. With no pages the model is not asked at all, nor
+    when ``direct`` already holds the answer (a line read from the page)."""
     hits = tuple(hits)
     yield Pages(hits)
+    if direct is not None:
+        yield Final(direct)
+        return
     if not hits:
         yield Final(parse(NOT_FOUND, hits, texts))
         return

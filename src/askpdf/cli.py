@@ -37,6 +37,7 @@ from askpdf.answer import (
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
 from askpdf.indexer import build_records, embed_missing, index_folder, pins
+from askpdf.pagelookup import find_page
 from askpdf.providers import http, ollama, openai_compat
 from askpdf.providers.base import ChatModel
 from askpdf.providers.ollama import OllamaEmbedder
@@ -687,11 +688,22 @@ def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         chat = _chat(args)
     except http.ProviderError as exc:
         return _error(err, exc)
-    hits, _ = _search(args, snapshot, err)
+    # "page 5 of report.pdf" names its page: read it rather than search for it.
+    lookup = find_page(args.question, snapshot)
+    if lookup is None:
+        hits, _ = _search(args, snapshot, err)
+    elif not lookup.hits:  # no such page, or which document is unclear
+        print(shown(lookup.notes[0]), file=out)
+        return 0
+    else:
+        for note in lookup.notes:
+            print(shown(note), file=err)
+        hits = lookup.hits
     chat = sized(chat, args.question, hits, snapshot.texts)
+    direct = None if lookup is None else lookup.answer
     final: Answer | None = None
     try:
-        for event in answer(args.question, hits, snapshot.texts, chat):
+        for event in answer(args.question, hits, snapshot.texts, chat, direct):
             if isinstance(event, Pages):
                 print(f"answering from {_plural(len(event.hits), 'page')}…", file=err)
                 if args.show_context and event.hits:

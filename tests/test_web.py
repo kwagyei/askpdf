@@ -738,3 +738,62 @@ def test_serve_with_hybrid_embeds_the_folder_and_searches_by_meaning(
 def test_serve_defaults_to_keyword_search(tmp_path: Path) -> None:
     args = build_parser().parse_args(["serve", str(tmp_path)])
     assert args.retriever == "bm25"
+
+
+# --- questions that name a page -------------------------------------------------------------
+
+
+def test_a_named_page_is_read_instead_of_searched(folder: Path) -> None:
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        events = _events(_ask(client, "what is on page 2 of policy.pdf").text)
+    assert events[0] == (
+        "search",
+        {"query": None, "used": "page", "notes": ["reading policy.pdf page 2 directly"]},
+    )
+    assert [p["page"] for p in events[1][1]["pages"]] == [2]
+    assert "=== Page [1]: policy.pdf, page 2 ===" in chat.users[0]
+
+
+def test_a_line_is_answered_without_the_model(folder: Path) -> None:
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        events = _events(_ask(client, "what is the first line of page 2 of policy").text)
+    assert [name for name, _ in events] == ["search", "pages", "final"]  # no tokens
+    final = events[-1][1]
+    assert (
+        final["text"]
+        == "Line 1 of page 2 reads: “Cookies need the Secure flag on every response.” [1]."
+    )
+    assert final["grounded"] and final["citations"][0]["href"].endswith("#page=2")
+    assert chat.users == []
+
+
+def test_a_missing_page_is_said_without_searching(folder: Path) -> None:
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        events = _events(_ask(client, "what is on page 40 of policy.pdf").text)
+    assert events == [
+        (
+            "final",
+            {
+                "not_found": True,
+                "text": "",
+                "grounded": False,
+                "dropped": [],
+                "citations": [],
+                "message": "policy.pdf has no page 40 (2 pages)",
+            },
+        )
+    ]
+    assert chat.users == []
+
+
+def test_a_follow_up_page_keeps_the_document(folder: Path) -> None:
+    make_pdf(folder / "other.pdf", [text_page("Unrelated words about tunnels.")])
+    assert main(["index", str(folder), "--index", str(folder.parent / "i.db")]) == 0
+    with _client(_app(folder)) as client:
+        cid = _conversation(client)
+        _ask(client, "what is on page 1 of policy.pdf", cid)
+        events = _events(_ask(client, "and page 2?", cid).text)
+    assert events[0][1]["notes"] == ["reading policy.pdf page 2 directly"]

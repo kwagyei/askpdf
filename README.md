@@ -78,6 +78,27 @@ The answer is right (page 26 names NFC), but only one of its three quotes checks
 other two are real sentences from page 26, filed under the wrong number. That is typical
 of the 3B model, and the results below count it.
 
+### Questions about a page or a line
+
+Search finds pages by their words, but "page 5 of report.pdf" is not a phrase on any page.
+So a question that names a page is answered from that page directly, both in `ask` and in
+the browser:
+
+- The document is matched by its file name, in any case, with or without `.pdf`, and with
+  spaces for dashes. Most of a long name ("NIST SP 800-63B") or one word that only one
+  file has ("the naca report") is enough. A folder of one PDF needs no name. A follow-up
+  ("and page 6?") keeps the document of the earlier question. If the name is missing or
+  fits several files, askpdf asks which one.
+- "Page 5" can mean the fifth page of the file or the page printed "5". When those differ,
+  both are read and the citation shows which one the answer came from. "PDF page 5" means
+  the fifth page of the file only.
+- A page that does not exist gets a plain reply ("report.pdf has no page 99 (12 pages)").
+- A question about a line ("what is the second line on page 4 of the naca report?") is
+  answered without the model at all: the line is read from the page's stored text and
+  cited like any quote. Lines are counted as the PDF's text layer gives them, blank lines
+  skipped, so a running header counts as a line and columns may not read in the order
+  they look.
+
 ### In the browser
 
 `askpdf FOLDER` (short for `askpdf serve FOLDER`) indexes the folder in the background and

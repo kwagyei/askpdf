@@ -148,7 +148,7 @@ function showFinal(turn, final) {
   turn.querySelector(".raw").hidden = true;
   result.replaceChildren();
   if (final.not_found) {
-    result.append(el("p", "notice", "The answer is not in these documents."));
+    result.append(el("p", "notice", final.message || "The answer is not in these documents."));
     result.hidden = false;
     return;
   }

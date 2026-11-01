@@ -42,6 +42,7 @@ from pydantic import BaseModel, Field
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from askpdf.answer import ANSWER_K, Answer, Final, Pages, Token, answer, source_name
+from askpdf.pagelookup import find_page
 from askpdf.providers import http
 from askpdf.providers.base import ChatModel
 from askpdf.retrieve import PageHit, Search, search
@@ -316,6 +317,9 @@ def _page(hit: PageHit, ids: Mapping[str, int]) -> dict[str, Any]:
     }
 
 
+NO_ANSWER = {"not_found": True, "text": "", "grounded": False, "dropped": [], "citations": []}
+
+
 def final_view(result: Answer, ids: Mapping[str, int]) -> dict[str, Any]:
     return {
         "not_found": result.not_found,
@@ -445,14 +449,27 @@ def create_app(
             # Follow-ups are searched with the conversation's questions joined: the
             # "concat" condition of the conversation eval (design revision 3).
             query = " ".join([*earlier, question])
-            found = retrieve(snapshot, query, k)
-            if earlier or found.notes:
-                # The query is shown only for follow-ups, where it differs from the question.
-                shown = query if earlier else None
-                yield sse("search", {"query": shown, "used": found.used, "notes": [*found.notes]})
-            hits = found.hits
+            lookup = find_page(question, snapshot, earlier)
+            if lookup is not None and not lookup.hits:
+                # No such page, or which document is unclear: say so, without the model.
+                conversations.add(cid, question)
+                yield sse("final", {**NO_ANSWER, "message": lookup.notes[0]})
+                return
+            if lookup is not None:  # names its page: read it rather than search for it
+                notes = [*lookup.notes]
+                yield sse("search", {"query": None, "used": "page", "notes": notes})
+                hits = lookup.hits
+            else:
+                found = retrieve(snapshot, query, k)
+                if earlier or found.notes:
+                    # The query is shown only for follow-ups, where it differs.
+                    shown = query if earlier else None
+                    notes = [*found.notes]
+                    yield sse("search", {"query": shown, "used": found.used, "notes": notes})
+                hits = found.hits
             chat = chat_for(question, hits, snapshot.texts)
-            for event in answer(question, hits, snapshot.texts, chat):
+            direct = None if lookup is None else lookup.answer
+            for event in answer(question, hits, snapshot.texts, chat, direct):
                 if isinstance(event, Pages):
                     pages = [
                         {
