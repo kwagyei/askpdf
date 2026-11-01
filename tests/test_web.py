@@ -813,7 +813,8 @@ def test_a_reply_naming_the_document_completes_the_unclear_question(folder: Path
         assert asked[0][1]["message"].startswith("which document do you mean?")
         events = _events(_ask(client, "policy", cid).text)
     assert events[0][1]["notes"] == ["reading policy.pdf page 2 directly"]
-    assert chat.users[0].endswith("Question: what is on page 2? policy")
+    # Answered as the completed question, which only points at the page: so described.
+    assert chat.users[0].endswith("Then write the Quotes section, as rule 2 says.")
 
 
 def test_a_reply_by_position_completes_it_too(folder: Path) -> None:
@@ -837,3 +838,16 @@ def test_an_unrelated_next_question_is_answered_as_itself(folder: Path) -> None:
     assert [n for n, _ in events][-1] == "final" and "message" not in events[-1][1]
     assert chat.users[0].endswith("Question: how many characters do passwords need")
     assert all(d.get("used") != "page" for n, d in again if n == "search")
+
+
+def test_a_bare_page_question_is_put_to_the_model_as_describe_the_page(folder: Path) -> None:
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        _ask(client, "what is on page 2 of policy.pdf")
+        _ask(client, "what does page 2 of policy.pdf say about cookies?")
+    assert chat.users[0].endswith(
+        "Question: What this page says? Describe the main points in a few sentences, each"
+        " ending with the number of its page, [1]. Then write the Quotes section, as rule 2"
+        " says."
+    )
+    assert chat.users[1].endswith("Question: what does page 2 of policy.pdf say about cookies?")

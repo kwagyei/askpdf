@@ -491,7 +491,8 @@ def create_app(
                 hits = found.hits
             chat = chat_for(question, hits, snapshot.texts)
             direct = None if lookup is None else lookup.answer
-            for event in answer(question, hits, snapshot.texts, chat, direct):
+            asked = (lookup.question if lookup else None) or question
+            for event in answer(asked, hits, snapshot.texts, chat, direct):
                 if isinstance(event, Pages):
                     pages = [
                         {

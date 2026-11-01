@@ -56,6 +56,8 @@ class Lookup:
     notes: tuple[str, ...]
     which: bool = False  # True when asking which document was meant
     answer: Answer | None = None  # set when the page text answers it without the model
+    # What to ask the model instead of the user's words, when those only point at the page.
+    question: str | None = None
 
 
 def _words(text: str) -> list[str]:
@@ -171,7 +173,8 @@ def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) ->
     )
     found = list(dict.fromkeys([*printed, *([physical] if physical else [])]))
     if not found:
-        return Lookup([], (f"{name} has no page {match.group('n')} ({len(pages)} pages)",))
+        count = f"{len(pages)} page" + ("" if len(pages) == 1 else "s")
+        return Lookup([], (f"{name} has no page {match.group('n')} ({count})",))
     if len(found) == 1:
         note = f"reading {name} page {found[0]} directly"
     else:
@@ -180,8 +183,97 @@ def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) ->
     hits = [_hit(snapshot, sha, p) for p in found]
     line = _LINE.search(question)
     if line is None:
-        return Lookup(hits, (note,))
+        return Lookup(hits, (note,), question=_describe(question, hits, snapshot.paths[sha]))
     return _read_line(line, hits, snapshot, name)
+
+
+# Words that only point at a page: "what is on page 5 of the third doc?"
+_POINTING = frozenset(
+    {
+        "what",
+        "whats",
+        "is",
+        "are",
+        "was",
+        "on",
+        "in",
+        "at",
+        "of",
+        "the",
+        "a",
+        "an",
+        "does",
+        "do",
+        "say",
+        "says",
+        "said",
+        "contain",
+        "contains",
+        "there",
+        "show",
+        "shows",
+        "tell",
+        "me",
+        "can",
+        "you",
+        "please",
+        "describe",
+        "summarise",
+        "summarize",
+        "summary",
+        "explain",
+        "give",
+        "overview",
+        "this",
+        "that",
+        "it",
+        "its",
+        "and",
+        "doc",
+        "document",
+        "file",
+        "pdf",
+        "page",
+        "pages",
+        "p",
+        "pg",
+        "here",
+        "written",
+        "report",
+        "paper",
+        "article",
+        "book",
+        "guide",
+        "one",
+    }
+)
+
+
+def _describe(question: str, hits: Sequence[PageHit], paths: Sequence[str]) -> str | None:
+    """A neutral question for a page question with no topic of its own. Asked "what is on
+    page 55", llama3.2:3b replied NOT_FOUND: no sentence on the page answers it. Told to
+    describe the pages, it does, in the citation format. A question with a topic ("what
+    does page 5 say about cookies?") keeps its own words."""
+    names = {w for path in paths for w in _words(PurePath(path).stem)}
+    topic = [
+        w
+        for w in _words(question)
+        if len(w) > 2
+        and w not in _POINTING
+        and w not in names
+        and w not in _ORDINALS
+        and w != "last"
+        and not w.isdecimal()
+        and not re.fullmatch(r"[ivxlcdm]+|\d+(?:st|nd|rd|th)", w)
+    ]
+    if topic:
+        return None
+    marks = " or ".join(f"[{n}]" for n in range(1, len(hits) + 1))
+    which = "these pages say" if len(hits) > 1 else "this page says"
+    return (
+        f"What {which}? Describe the main points in a few sentences, each ending with"
+        f" the number of its page, {marks}. Then write the Quotes section, as rule 2 says."
+    )
 
 
 def _line_number(match: re.Match[str]) -> int:

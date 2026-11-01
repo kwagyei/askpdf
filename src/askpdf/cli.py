@@ -701,9 +701,10 @@ def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         hits = lookup.hits
     chat = sized(chat, args.question, hits, snapshot.texts)
     direct = None if lookup is None else lookup.answer
+    asked = (lookup.question if lookup else None) or args.question
     final: Answer | None = None
     try:
-        for event in answer(args.question, hits, snapshot.texts, chat, direct):
+        for event in answer(asked, hits, snapshot.texts, chat, direct):
             if isinstance(event, Pages):
                 print(f"answering from {_plural(len(event.hits), 'page')}…", file=err)
                 if args.show_context and event.hits:

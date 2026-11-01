@@ -313,3 +313,51 @@ def test_a_name_wins_over_a_position(snapshot: Snapshot) -> None:
 def test_only_the_which_question_is_marked_as_such(snapshot: Snapshot) -> None:
     missing = find_page("page 99 of the annual report", snapshot)
     assert missing is not None and not missing.which
+
+
+# --- what the model is asked ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "what is on page 3 of the annual report?",
+        "what I on page 1 of the third doc",  # a typo is not a topic
+        "summarise PDF page 3 of annual-report-2024.pdf",
+        "explain p. 1 of the last pdf",
+        "what's on page ii of the first one",
+    ],
+)
+def test_a_bare_page_question_asks_the_model_to_describe_the_page(
+    question: str, snapshot: Snapshot
+) -> None:
+    lookup = find_page(question, snapshot)
+    assert lookup is not None and lookup.question is not None
+    assert lookup.question.startswith("What ")
+    assert "Quotes section" in lookup.question
+
+
+def test_the_neutral_question_names_each_page_number(snapshot: Snapshot) -> None:
+    one = find_page("what is on PDF page 3 of the annual report", snapshot)
+    two = find_page("what is on page 2 of the annual report", snapshot)  # pages 4 and 2
+    assert one is not None and one.question is not None and two is not None
+    assert one.question.startswith("What this page says?") and ", [1]." in one.question
+    assert two.question is not None and "[1] or [2]" in two.question
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "what does page 3 of the annual report say about methods?",
+        "on page 3 of the annual report, who measured everything?",
+        "does page 2 of the annual report mention introduction",
+    ],
+)
+def test_a_page_question_with_a_topic_keeps_its_words(question: str, snapshot: Snapshot) -> None:
+    lookup = find_page(question, snapshot)
+    assert lookup is not None and lookup.hits and lookup.question is None
+
+
+def test_a_line_question_needs_no_model_question(snapshot: Snapshot) -> None:
+    lookup = find_page("the first line of PDF page 3 of the annual report", snapshot)
+    assert lookup is not None and lookup.answer is not None and lookup.question is None
