@@ -678,10 +678,10 @@ def test_the_package_ships_the_page() -> None:
 
     for name in ("index.html", "app.css", "app.js"):
         assert (app.STATIC / name).is_file()
-    html = (app.STATIC / "index.html").read_text()
+    html = (app.STATIC / "index.html").read_text(encoding="utf-8")
     # The CSP allows no inline script or style, so the page must have none.
     assert "<script>" not in html and "style=" not in html and "<style" not in html
-    js = (app.STATIC / "app.js").read_text()
+    js = (app.STATIC / "app.js").read_text(encoding="utf-8")
     assert "innerHTML" not in js and "insertAdjacentHTML" not in js
 
 

@@ -708,7 +708,7 @@ def _static() -> Path:
 def test_the_page_has_no_inline_script_style_or_handler() -> None:
     import re
 
-    html = (_static() / "index.html").read_text()
+    html = (_static() / "index.html").read_text(encoding="utf-8")
     for script in re.findall(r"<script\b[^>]*>(.*?)</script>", html, re.S):
         assert script.strip() == ""
     assert not re.search(r"<style\b", html, re.I)
@@ -720,7 +720,7 @@ def test_the_page_has_no_inline_script_style_or_handler() -> None:
 def test_app_js_never_writes_html() -> None:
     import re
 
-    js = (_static() / "app.js").read_text()
+    js = (_static() / "app.js").read_text(encoding="utf-8")
     for banned in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(",
                    "new Function", "srcdoc", "createContextualFragment", "DOMParser",
                    ".html("):  # fmt: skip
