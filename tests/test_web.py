@@ -681,3 +681,11 @@ def test_the_package_ships_the_page() -> None:
     assert "<script>" not in html and "style=" not in html and "<style" not in html
     js = (app.STATIC / "app.js").read_text()
     assert "innerHTML" not in js and "insertAdjacentHTML" not in js
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+def test_every_unsafe_method_needs_the_origin(client: TestClient, method: str) -> None:
+    assert client.request(method, "/api/conversations").status_code == 403
+    # With the right origin it only reaches the router, which has no such route.
+    response = client.request(method, "/api/conversations", headers={"Origin": BASE})
+    assert response.status_code == 405

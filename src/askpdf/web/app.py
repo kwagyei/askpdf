@@ -15,6 +15,7 @@ and only if the file still resolves to a regular PDF inside the folder.
 import asyncio
 import hmac
 import json
+import logging
 import os
 import re
 import secrets
@@ -24,12 +25,18 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from http.cookies import CookieError, SimpleCookie
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -41,12 +48,14 @@ from askpdf.retrieve import PageHit, search_bm25
 from askpdf.snapshot import Snapshot
 from askpdf.store import Store
 
+log = logging.getLogger(__name__)
 STATIC = Path(__file__).with_name("static")
 MAX_QUESTION = 2000
 HISTORY_TURNS = 3  # a follow-up is searched with up to this many questions joined
 MAX_CONVERSATIONS = 100  # kept in memory only; the oldest is forgotten first
 SNIPPET_CHARS = 240
-_FILE_ID = re.compile(r"[0-9]{1,18}")  # fits SQLite's 64-bit rowid
+CHUNK_BYTES = 64 * 1024
+_FILE_ID = re.compile(r"[1-9][0-9]{0,17}")  # one spelling per id; fits a 64-bit rowid
 
 CSP = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
 SECURITY_HEADERS = [
@@ -93,7 +102,8 @@ class Guard:
         if host not in self.hosts:
             await _plain(send, 400, "unknown Host")
             return
-        if scope["method"] == "POST" and headers.get("origin") != f"http://{host}":
+        unsafe = scope["method"] not in ("GET", "HEAD", "OPTIONS")
+        if unsafe and headers.get("origin") != f"http://{host}":
             await _plain(send, 403, "cross-origin request refused")
             return
         if path.startswith(("/api/", "/pdf/")) and not self.has_session(headers.get("cookie")):
@@ -112,14 +122,21 @@ class Guard:
         await self.app(scope, receive, send_with_headers)
 
     def has_session(self, header: str | None) -> bool:
-        if not header:
-            return False
-        try:
-            cookies = SimpleCookie(header)
-        except CookieError:
-            return False
-        morsel = cookies.get(self.cookie)
-        return morsel is not None and same_secret(morsel.value, self.token)
+        return has_session(header, self.cookie, self.token)
+
+
+def has_session(header: str | None, name: str, token: str) -> bool:
+    """True if the Cookie header holds ``name=token``. Parsed by hand and leniently:
+    cookies ignore ports, so another app on localhost may have set cookies that a strict
+    parser gives up on, which would hide ours."""
+    for part in (header or "").split(";"):
+        key, _, value = part.strip().partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] == '"':
+            value = value[1:-1]  # a quoted value, as RFC 6265 allows
+        if key == name and same_secret(value, token):
+            return True
+    return False
 
 
 def same_secret(given: str, token: str) -> bool:
@@ -216,32 +233,35 @@ class Library:
             "failed": [{"path": f.path, "reason": f.error or ""} for f in failed],
         }
 
-    def pdf(self, file_id: int) -> bytes | None:
-        """The bytes of an indexed file, or None unless it is still a regular PDF inside
-        the folder. The path is resolved again now: the file may have been replaced by a
-        symlink since it was indexed."""
+    def pdf(self, file_id: int) -> tuple[BinaryIO, int] | None:
+        """An indexed file, opened, and its size; None unless it is still a regular PDF
+        inside the folder. The path is resolved again now: the file may have been replaced
+        by a symlink since it was indexed."""
         with self._store() as store:
             rel = store.file_path(file_id)
         if rel is None:
             return None
         real = os.path.realpath(self.root / rel)
-        if os.path.commonpath([self.root, real]) != str(self.root):
+        try:
+            if os.path.commonpath([self.root, real]) != str(self.root):
+                return None
+        except ValueError:  # Windows: on another drive
             return None
         if not real.casefold().endswith(".pdf"):
             return None
         # O_NOFOLLOW: if the last component became a symlink after the check, open fails.
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        # O_NONBLOCK: a FIFO swapped in would otherwise block open() until a writer came.
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
         try:
             fd = os.open(real, flags)
         except OSError:
             return None
-        try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):  # a folder opens too
-                return None
-            with os.fdopen(fd, "rb", closefd=False) as f:
-                return f.read()
-        finally:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):  # a folder or a FIFO opens too
             os.close(fd)
+            return None
+        return os.fdopen(fd, "rb"), info.st_size
 
 
 class Conversations:
@@ -275,7 +295,9 @@ class Conversations:
 
 
 def sse(event: str, data: object) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    # ASCII only: a lone surrogate (from a question, the model or a PDF) is escaped
+    # instead of failing to encode as UTF-8 and killing the stream.
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 def _snippet(text: str) -> str:
@@ -354,6 +376,13 @@ def create_app(
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # FastAPI's own handler echoes the input back, which fails to encode (a 500)
+        # when the input holds a lone surrogate. Where and why is enough.
+        errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+        return JSONResponse({"detail": errors}, status_code=422)
+
     @app.get("/", response_model=None)
     def home(request: Request) -> Response:
         given = request.query_params.get("token")
@@ -366,7 +395,7 @@ def create_app(
                 cookie_name(port), token, httponly=True, samesite="strict", path="/"
             )
             return response
-        if not same_secret(request.cookies.get(cookie_name(port), ""), token):
+        if not has_session(request.headers.get("cookie"), cookie_name(port), token):
             return HTMLResponse(START_FROM_TERMINAL, status_code=403)
         return HTMLResponse((STATIC / "index.html").read_text(encoding="utf-8"))
 
@@ -439,6 +468,9 @@ def create_app(
             yield sse("error", {"message": f"{exc}; start Ollama (ollama serve) and try again"})
         except http.ProviderError as exc:
             yield sse("error", {"message": str(exc)})
+        except Exception:
+            log.exception("answering failed")
+            yield sse("error", {"message": "askpdf failed while answering; see the terminal"})
         finally:
             answering.release()
 
@@ -446,13 +478,20 @@ def create_app(
     def pdf(file_id: str) -> Response:
         # Only plain digits name a file; anything else is "not found", not a 422 that
         # describes the parameter.
-        data = library.pdf(int(file_id)) if _FILE_ID.fullmatch(file_id) else None
-        if data is None:
+        opened = library.pdf(int(file_id)) if _FILE_ID.fullmatch(file_id) else None
+        if opened is None:
             raise HTTPException(404, "no such document")
-        return Response(
-            data,
+        f, size = opened
+
+        def chunks() -> Iterator[bytes]:
+            with f:  # streamed, so a large PDF is never held in memory whole
+                while chunk := f.read(CHUNK_BYTES):
+                    yield chunk
+
+        return StreamingResponse(
+            chunks(),
             media_type="application/pdf",
-            headers={"Content-Disposition": "inline"},
+            headers={"Content-Disposition": "inline", "Content-Length": str(size)},
         )
 
     return Guard(app, port, token)

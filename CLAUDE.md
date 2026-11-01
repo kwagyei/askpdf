@@ -23,8 +23,8 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
   so `eval/tools/rescore_answers.py` re-checks them after a validation change without
   rerunning the model.
 - `askpdf FOLDER` = `askpdf serve`: `web/app.py` (FastAPI, wrapped in the `Guard` ASGI
-  middleware: Host allow-list, session cookie, same-origin POST, security headers) and
-  `web/static/` (one page, vanilla JS, no inline script or style: the CSP forbids it).
+  middleware: Host allow-list, session cookie, same origin for every non-GET, security
+  headers) and `web/static/` (one page, vanilla JS, no inline script or style: the CSP forbids it).
   PDFs are served by `files.rowid` only, re-resolved inside the root on every request.
   Tests in `tests/test_web.py` cover every case in design §12.
 - Dense/hybrid evaluation needs Ollama, so it runs locally (`eval/tools/tune_retrieval.py`)

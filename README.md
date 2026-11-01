@@ -94,7 +94,8 @@ requests, so it guards against that:
   but its own (against DNS rebinding).
 - The link printed in the terminal carries a one-time key, which the page swaps for an
   HttpOnly, SameSite=Strict cookie. Without that cookie the API and the PDFs answer 403.
-- A POST must come from the page's own origin.
+- A request that can change anything (any method but GET, HEAD and OPTIONS) must come
+  from the page's own origin.
 - A PDF is requested by the number of its row in the index, never by a path. Before it is
   sent, the file is resolved again and must still be a regular `.pdf` inside the folder,
   so a file swapped for a symlink after indexing is refused.
