@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from askpdf.answer import Answer, Citation
+from askpdf.answer import ANSWER_K, Answer, Citation
 from askpdf.quotes import QuoteCheck
 from askpdf.retrieve import PageHit
 from askpdf.snapshot import Chunk, Snapshot
@@ -62,6 +62,44 @@ class Lookup:
 
 def _words(text: str) -> list[str]:
     return _WORD.findall(unicodedata.normalize("NFKC", text).casefold())
+
+
+# "summarise X", "a summary of X", "an overview of X", "the gist", "tl;dr"
+_SUMMARY = re.compile(r"\b(?:summari[sz]e|summary|overview|gist|tl;?dr)\b", re.I)
+# "what is X about?": a summary request only when X names a document
+_ABOUT = re.compile(r"\bwhat(?:'s|\s+is)\b.*\babout\s*\??\s*$", re.I)
+_PART = re.compile(r"\b(?:chapters?|sections?|parts?|appendix|appendices)\b", re.I)
+
+
+def _summary(question: str, snapshot: Snapshot) -> Lookup | None:
+    """A plain reply to a request to summarise a whole document or chapter, which askpdf
+    cannot do yet: it answers from a few searched pages, so a "summary" would cover those
+    alone and look complete. A summary of a topic ("summarise what it says about
+    passwords") is left to the search, which serves it well."""
+    asks = _SUMMARY.search(question) or _ABOUT.search(question)
+    if not asks or not snapshot.paths:
+        return None
+    sha, _ = _document(snapshot, [question])
+    if sha is None and not _SUMMARY.search(question):
+        return None  # "what is this about?" is a follow-up, not a summary request
+    first = sha or min(snapshot.paths, key=lambda s: snapshot.paths[s])
+    name = PurePath(snapshot.paths[first][0]).name
+    example = f"\u201csummarise page 12 of {name}\u201d"
+    if _PART.search(question):
+        note = (
+            "askpdf cannot find chapters or sections yet: it does not read a PDF's table of"
+            f" contents. Name a page instead, such as {example}, or ask about the topic."
+        )
+        return Lookup([], (note,))
+    paths = [p for ps in snapshot.paths.values() for p in ps]
+    if _topic(question, paths):
+        return None  # a topic to search for
+    note = (
+        f"askpdf cannot summarise a whole document yet. It answers from {ANSWER_K} pages"
+        " at a time, so a summary would cover only those. Ask about a topic in it, or name"
+        f" a page, such as {example}."
+    )
+    return Lookup([], (note,))
 
 
 def _ordinal(match: re.Match[str]) -> int:
@@ -147,10 +185,11 @@ def _hit(snapshot: Snapshot, sha: str, page: int) -> PageHit:
 
 def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) -> Lookup | None:
     """The page a question names, or None if it names none. A follow-up such as "and
-    page 6?" takes the document from the earlier questions."""
+    page 6?" takes the document from the earlier questions. A request to summarise a
+    whole document or chapter gets a plain reply, with no pages."""
     match = _PAGE.search(question)
     if match is None:
-        return None
+        return _summary(question, snapshot)
     sha, tied = _document(snapshot, [question, *reversed(earlier)])
     if sha is None:
         # A page number but no clear document: searching would not find the page either.
@@ -239,6 +278,17 @@ _POINTING = frozenset(
         "pg",
         "here",
         "written",
+        "about",
+        "gist",
+        "tldr",
+        "whole",
+        "entire",
+        "short",
+        "brief",
+        "quick",
+        "documents",
+        "pdfs",
+        "files",
         "report",
         "paper",
         "article",
@@ -249,13 +299,11 @@ _POINTING = frozenset(
 )
 
 
-def _describe(question: str, hits: Sequence[PageHit], paths: Sequence[str]) -> str | None:
-    """A neutral question for a page question with no topic of its own. Asked "what is on
-    page 55", llama3.2:3b replied NOT_FOUND: no sentence on the page answers it. Told to
-    describe the pages, it does, in the citation format. A question with a topic ("what
-    does page 5 say about cookies?") keeps its own words."""
+def _topic(question: str, paths: Sequence[str]) -> list[str]:
+    """The words of a question that are about something, not just pointing at a page or
+    a document: none in "what is on page 5 of the annual report?"."""
     names = {w for path in paths for w in _words(PurePath(path).stem)}
-    topic = [
+    return [
         w
         for w in _words(question)
         if len(w) > 2
@@ -266,7 +314,14 @@ def _describe(question: str, hits: Sequence[PageHit], paths: Sequence[str]) -> s
         and not w.isdecimal()
         and not re.fullmatch(r"[ivxlcdm]+|\d+(?:st|nd|rd|th)", w)
     ]
-    if topic:
+
+
+def _describe(question: str, hits: Sequence[PageHit], paths: Sequence[str]) -> str | None:
+    """A neutral question for a page question with no topic of its own. Asked "what is on
+    page 55", llama3.2:3b replied NOT_FOUND: no sentence on the page answers it. Told to
+    describe the pages, it does, in the citation format. A question with a topic ("what
+    does page 5 say about cookies?") keeps its own words."""
+    if _topic(question, paths):
         return None
     marks = " or ".join(f"[{n}]" for n in range(1, len(hits) + 1))
     which = "these pages say" if len(hits) > 1 else "this page says"

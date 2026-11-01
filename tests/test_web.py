@@ -851,3 +851,12 @@ def test_a_bare_page_question_is_put_to_the_model_as_describe_the_page(folder: P
         " says."
     )
     assert chat.users[1].endswith("Question: what does page 2 of policy.pdf say about cookies?")
+
+
+def test_a_document_summary_is_answered_plainly_without_the_model(folder: Path) -> None:
+    chat = ScriptedChat(REPLY)
+    with _client(_app(folder, chat)) as client:
+        events = _events(_ask(client, "summarise policy.pdf").text)
+    assert [n for n, _ in events] == ["final"]
+    assert events[0][1]["message"].startswith("askpdf cannot summarise a whole document yet.")
+    assert chat.users == []

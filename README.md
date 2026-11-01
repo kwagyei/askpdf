@@ -98,6 +98,10 @@ the browser:
   cited like any quote. Lines are counted as the PDF's text layer gives them, blank lines
   skipped, so a running header counts as a line and columns may not read in the order
   they look.
+- A request to summarise a whole document or chapter gets a plain reply saying askpdf
+  cannot do that yet, with a suggestion that works ("summarise page 12 of …"), rather
+  than a summary of the few pages a search happened to find. A summary of a topic
+  ("summarise what it says about passwords") is searched as usual.
 
 ### In the browser
 
@@ -256,6 +260,8 @@ listed in `eval/corpus/SOURCES.md`.
   0.500 against 0.429 as typed on 14 development follow-ups, though the intervals
   overlap), but a question such as "is it applied before hashing?" is still answered
   without knowing what "it" is.
+- No summaries of whole documents or chapters: answers come from 3 pages, and askpdf
+  does not read a PDF's table of contents. Such requests are declined plainly.
 - The web app answers one question at a time and indexes the folder once when it starts;
   files added later are found after a restart (watching the folder is the next pull
   request). It searches by keyword unless started with `--retriever`.

@@ -60,7 +60,6 @@ def _pages(question: str, snapshot: Snapshot, earlier: tuple[str, ...] = ()) -> 
     [
         "how long must passwords be?",
         "which page talks about methods?",
-        "summarise the annual report",
         "it has 5 pages",
         "what do pages 3 to 4 say about annual-report-2024",
     ],
@@ -361,3 +360,64 @@ def test_a_page_question_with_a_topic_keeps_its_words(question: str, snapshot: S
 def test_a_line_question_needs_no_model_question(snapshot: Snapshot) -> None:
     lookup = find_page("the first line of PDF page 3 of the annual report", snapshot)
     assert lookup is not None and lookup.answer is not None and lookup.question is None
+
+
+# --- summary requests -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "summarise annual-report-2024.pdf",
+        "Summarize the annual report",
+        "give me a summary of the first pdf",
+        "an overview of nist-sp-800-53 please",
+        "tl;dr of the annual report",
+        "what is the annual report about?",
+        "summarise the documents",
+    ],
+)
+def test_a_whole_document_summary_gets_a_plain_reply(question: str, snapshot: Snapshot) -> None:
+    lookup = find_page(question, snapshot)
+    assert lookup is not None and lookup.hits == [] and not lookup.which
+    assert lookup.notes[0].startswith("askpdf cannot summarise a whole document yet.")
+    assert "\u201csummarise page 12 of " in lookup.notes[0]
+
+
+def test_the_reply_suggests_the_named_document(snapshot: Snapshot) -> None:
+    lookup = find_page("summarise nist-sp-800-53", snapshot)
+    assert lookup is not None
+    assert "\u201csummarise page 12 of nist-sp-800-53.pdf\u201d" in lookup.notes[0]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "summarise the theory chapter of the annual report",
+        "an overview of section 3 of nist-sp-800-53",
+        "summarize appendix A",
+    ],
+)
+def test_a_chapter_summary_says_chapters_are_not_known(question: str, snapshot: Snapshot) -> None:
+    lookup = find_page(question, snapshot)
+    assert lookup is not None and lookup.hits == []
+    assert lookup.notes[0].startswith("askpdf cannot find chapters or sections yet")
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "summarise what the annual report says about methods",
+        "give me an overview of password rules",
+        "what is this about?",
+        "what was the measurement about?",
+        "how long must passwords be?",
+    ],
+)
+def test_a_topic_or_a_follow_up_is_still_searched(question: str, snapshot: Snapshot) -> None:
+    assert find_page(question, snapshot) is None
+
+
+def test_a_page_summary_is_still_read_from_the_page(snapshot: Snapshot) -> None:
+    lookup = find_page("summarise page 1 of the annual report", snapshot)
+    assert lookup is not None and [h.page for h in lookup.hits] == [3, 1]  # printed 1, sheet 1
