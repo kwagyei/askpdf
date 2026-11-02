@@ -2917,6 +2917,1420 @@
         }
       },
       "release": "v0.1.0"
+    },
+    "answers": {
+      "stage": "answers",
+      "split": "test",
+      "retriever": "bm25",
+      "k": 3,
+      "model": "llama3.2:3b",
+      "ollama_version": "0.40.5",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "n_questions": 53,
+      "n_answerable": 46,
+      "n_unanswerable": 7,
+      "grounding": {
+        "n_answers": 43,
+        "n_citations": 49,
+        "quote_verified_rate": 0.346939,
+        "folding_only_share": 0.0,
+        "supported_sentence_rate": 0.307692,
+        "grounded_rate": 0.395349,
+        "grounded_interval_95": [
+          0.255814,
+          0.534884
+        ],
+        "dropped_citations": 1,
+        "unverified_misnumbered": 9,
+        "unverified_no_quote": 10,
+        "unverified_too_short": 1
+      },
+      "abstention": {
+        "false_answer_rate": 0.428571,
+        "not_found_precision": 0.571429,
+        "not_found_recall": 0.571429,
+        "over_abstention_rate": 0.065217,
+        "over_abstention_interval_95": [
+          0.0,
+          0.152174
+        ]
+      },
+      "seconds_median": 70.8,
+      "per_question": {
+        "naca-02": {
+          "answerable": true,
+          "kind": "scanned",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "naca-rm-l56l14a",
+              "page": 2,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "By George W. Jones, Jr"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 2,
+          "supported": 0,
+          "seconds": 49.7,
+          "answer": "The report on the transonic flutter of the thin sweptback wing was written by George W. Jones, Jr. [1]",
+          "raw": "The report on the transonic flutter of the thin sweptback wing was written by George W. Jones, Jr. [1]\n\nQuotes:\n[1] \"By George W. Jones, Jr.\""
+        },
+        "naca-04": {
+          "answerable": true,
+          "kind": "scanned",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "naca-rm-l56l14a",
+              "page": 2,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "the subsonic level of the flutter boundary for the 10° sweptback wing lies above those for the 00 and 300 sweptback wings",
+                "the amount of rise in the flutter boundary from the subsonic level to low supersonic values is about the same for the wings with angles of sweepback of 10° and 00",
+                "but is much greater for the wing with an angle of sweepback of 30°"
+              ],
+              "reasons": [
+                "not found on the page",
+                "not found on the page",
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 94.4,
+          "answer": "The flutter boundary near Mach 0.8 for the 10-degree wing lies above those for the 00 and 300 sweptback wings, and the amount of rise in the flutter boundary from the subsonic level to low supersonic values is about the same for the wings with angles of sweepback of 10° and 00, but is much greater for the wing with an angle of sweepback of 30° [1].",
+          "raw": "The flutter boundary near Mach 0.8 for the 10-degree wing lies above those for the 00 and 300 sweptback wings, and the amount of rise in the flutter boundary from the subsonic level to low supersonic values is about the same for the wings with angles of sweepback of 10° and 00, but is much greater for the wing with an angle of sweepback of 30° [2].\n\nQuotes:\n[2] \"the subsonic level of the flutter boundary for the 10° sweptback wing lies above those for the 00 and 300 sweptback wings\"\n[2] \"the amount of rise in the flutter boundary from the subsonic level to low supersonic values is about the same for the wings with angles of sweepback of 10° and 00\"\n[2] \"but is much greater for the wing with an angle of sweepback of 30°\""
+        },
+        "naca-06": {
+          "answerable": true,
+          "kind": "scanned",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "naca-rm-l56l14a",
+              "page": 6,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 51.4,
+          "answer": "The test section of the tunnel measures 26 inches between flats [1].",
+          "raw": "The test section of the tunnel measures 26 inches between flats [1]."
+        },
+        "naca-08": {
+          "answerable": true,
+          "kind": "scanned",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 72.5,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "naca-10": {
+          "answerable": true,
+          "kind": "scanned",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "naca-rm-l56l14a",
+              "page": 6,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "a recording oscillograph was used to give a continuous record of the strain-gage signals",
+                "tunnel stagnation temperature and pressure"
+              ],
+              "reasons": [
+                "",
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 74.9,
+          "answer": "A recording oscillograph was used to give a continuous record of the strain-gage signals, tunnel stagnation temperature and pressure, and test-section static pressure [1].",
+          "raw": "A recording oscillograph was used to give a continuous record of the strain-gage signals, tunnel stagnation temperature and pressure, and test-section static pressure [1].\n\nQuotes:\n[1] \"a recording oscillograph was used to give a continuous record of the strain-gage signals\"\n[1] \"tunnel stagnation temperature and pressure\""
+        },
+        "nist-02": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 15,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "The use of potential fraud indicators prior to or during the authentication process does not impact or change the AAL of a transaction or substitute for an authentication factor"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 123,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "At all AALs, indicators of potential fraud, including applicable indicators described in Sec. 5.3, MAY be used to lower the risk of misauthentication"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                15
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 2,
+          "supported": 1,
+          "seconds": 57.0,
+          "answer": "Checking for signs of fraud during login does not change the assurance level of a transaction, but may prompt the use of additional risk-based controls [1]. The assurance level of a transaction is determined by the authentication process used, not by the presence or absence of fraud indicators [2].",
+          "raw": "Checking for signs of fraud during login does not change the assurance level of a transaction, but may prompt the use of additional risk-based controls [1]. The assurance level of a transaction is determined by the authentication process used, not by the presence or absence of fraud indicators [2].\n\nQuotes:\n[1] \"The use of potential fraud indicators prior to or during the authentication process does not impact or change the AAL of a transaction or substitute for an authentication factor\"\n[2] \"At all AALs, indicators of potential fraud, including applicable indicators described in Sec. 5.3, MAY be used to lower the risk of misauthentication\""
+        },
+        "nist-05": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 67,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "The inactivity timeout SHALL be no more than 1 hour"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 47.0,
+          "answer": "The inactivity timeout at AAL2 SHALL be no more than 1 hour [1].",
+          "raw": "The inactivity timeout at AAL2 SHALL be no more than 1 hour [3].\n\nQuotes:\n[3] \"The inactivity timeout SHALL be no more than 1 hour\""
+        },
+        "nist-06": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 42,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "a high-quality biometric system has both a very low FMR and FNMR"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 58.2,
+          "answer": "According to NIST SP 800-63B-4, a fingerprint alone is not considered an authenticator, as biometric comparisons are probabilistic and do not provide sufficient confidence in the subscriber's authentication by itself [1].",
+          "raw": "According to NIST SP 800-63B-4, a fingerprint alone is not considered an authenticator, as biometric comparisons are probabilistic and do not provide sufficient confidence in the subscriber's authentication by itself [3].\n\nQuotes:\n[3] \"a high-quality biometric system has both a very low FMR and FNMR\""
+        },
+        "nist-09": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 46.8,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "nist-10": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 20,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "The overall timeout for reauthentication SHALL be no more than 12 hours"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 54.0,
+          "answer": "The overall timeout for reauthentication at AAL3 SHALL be no more than 12 hours [1].",
+          "raw": "The overall timeout for reauthentication at AAL3 SHALL be no more than 12 hours [1]. \n\nQuotes:\n[1] \"The overall timeout for reauthentication SHALL be no more than 12 hours\""
+        },
+        "nist-13": {
+          "answerable": true,
+          "kind": "table",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 22,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "Replay resistance is not required for AAL1"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 52.7,
+          "answer": "Replay resistance is not required at AAL1, but it is recommended that applications assessed at AAL1 offer multi-factor authentication options [1].",
+          "raw": "Replay resistance is not required at AAL1, but it is recommended that applications assessed at AAL1 offer multi-factor authentication options [1]. \n\nQuotes:\n[1] \"Replay resistance is not required for AAL1\""
+        },
+        "nist-15": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 99,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "a password may be as short as 4 characters if it is only ever used together with a second factor"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 56.4,
+          "answer": "A password may be as short as 4 characters if it is only ever used together with a second factor [1].",
+          "raw": "A password may be as short as 4 characters if it is only ever used together with a second factor [3].\n\nQuotes:\n[3] \"a password may be as short as 4 characters if it is only ever used together with a second factor\"\n[3] \"a password may be as short as 4 characters if it is only ever used together with a second factor\""
+        },
+        "nist-17": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 83,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "or security questions when choosing passwords",
+                "or security questions"
+              ],
+              "reasons": [
+                "not found on the page",
+                "shorter than 5 words"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                25
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 60.0,
+          "answer": "According to NIST SP 800-63B-4, verifiers and CSPs SHALL NOT prompt subscribers to use knowledge-based authentication (KBA) (e.g., “What was the name of your first pet?”) or security questions when choosing passwords [1].",
+          "raw": "According to NIST SP 800-63B-4, verifiers and CSPs SHALL NOT prompt subscribers to use knowledge-based authentication (KBA) (e.g., “What was the name of your first pet?”) or security questions when choosing passwords [3].\n\nQuotes:\n[3] \"or security questions when choosing passwords\"\n[3] \"or security questions\""
+        },
+        "nist-19": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 83,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 43.9,
+          "answer": "Verifiers SHALL allow the use of password managers and autofill functionality [1].",
+          "raw": "Verifiers SHALL allow the use of password managers and autofill functionality [2]."
+        },
+        "nist-21": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 28,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "A look-up secret SHALL be at least six decimal digits (or equivalent) in length"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 51.5,
+          "answer": "A look-up secret SHALL be at least six decimal digits (or equivalent) in length [1].",
+          "raw": "A look-up secret SHALL be at least six decimal digits (or equivalent) in length [1]. \n\nQuotes:\n[1] \"A look-up secret SHALL be at least six decimal digits (or equivalent) in length\"\n[1] \"A look-up secret SHALL be at least six decimal digits (or equivalent) in length\""
+        },
+        "nist-22": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 58,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "a printed list of recovery codes can be used successfully only once"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 50.8,
+          "answer": "A printed list of recovery codes can be used successfully only once [1].",
+          "raw": "A printed list of recovery codes can be used successfully only once [1].\n\nQuotes:\n[1] \"a printed list of recovery codes can be used successfully only once\"\n[1] \"a printed list of recovery codes can be used successfully only once\""
+        },
+        "nist-25": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 32,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "the device SHOULD NOT display the authentication secret while it is locked by the owner"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 53.1,
+          "answer": "According to the guidelines, a locked phone device SHOULD NOT display the authentication secret while it is locked by the owner, but rather require the presentation and verification of a PIN, passcode, or biometric characteristic to view the secret [1].",
+          "raw": "According to the guidelines, a locked phone device SHOULD NOT display the authentication secret while it is locked by the owner, but rather require the presentation and verification of a PIN, passcode, or biometric characteristic to view the secret [1].\n\nQuotes:\n[1] \"the device SHOULD NOT display the authentication secret while it is locked by the owner\""
+        },
+        "nist-27": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 54,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 52.1,
+          "answer": "According to the guidelines, generating a new authentication secret does not reset the failed authentication count [1].",
+          "raw": "According to the guidelines, generating a new authentication secret does not reset the failed authentication count [3]."
+        },
+        "nist-29": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 34,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "OTP authentication is not phishing-resistant"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 50.3,
+          "answer": "OTP authenticators and verifiers are not required to be validated by the Cryptography Module Validation Program [CMVP] for FIPS 140, but [FIPS140] validation of OTP authenticators and verifiers is not required [1].",
+          "raw": "OTP authenticators and verifiers are not required to be validated by the Cryptography Module Validation Program [CMVP] for FIPS 140, but [FIPS140] validation of OTP authenticators and verifiers is not required [3].\n\nQuotes:\n[3] \"OTP authentication is not phishing-resistant\""
+        },
+        "nist-30": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 129.8,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "nist-32": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 42,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 124.9,
+          "answer": "The verifier SHOULD disregard any previous failed attempts for the authenticators used in the successful authentication [1].",
+          "raw": "The verifier SHOULD disregard any previous failed attempts for the authenticators used in the successful authentication [3]."
+        },
+        "nist-35": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 22,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "A non-biometric authentication option SHALL always be provided to the subscriber"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 97.1,
+          "answer": "A non-biometric authentication option SHALL always be provided to the subscriber [1].",
+          "raw": "A non-biometric authentication option SHALL always be provided to the subscriber [3]. \n\nQuotes:\n[3] \"A non-biometric authentication option SHALL always be provided to the subscriber\""
+        },
+        "nist-36": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 44,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "the biometric authenticator SHALL impose a delay of at least 30 seconds before each subsequent attempt"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 80.6,
+          "answer": "The biometric authenticator SHALL impose a delay of at least 30 seconds before each subsequent attempt with an overall limit of no more than 50 consecutive failed authentication attempts or 100 if PAD is implemented due to the mitigation of presentation attacks, once the overall limit is reached, the biometric system SHALL disable biometric authentication and offer another factor [1].",
+          "raw": "The biometric authenticator SHALL impose a delay of at least 30 seconds before each subsequent attempt with an overall limit of no more than 50 consecutive failed authentication attempts or 100 if PAD is implemented due to the mitigation of presentation attacks, once the overall limit is reached, the biometric system SHALL disable biometric authentication and offer another factor [1].\n\nQuotes:\n[1] \"the biometric authenticator SHALL impose a delay of at least 30 seconds before each subsequent attempt\""
+        },
+        "nist-39": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 46,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "WebAuthn, which is used by authenticators that implement the Fast Identity Online 2 (FIDO2) specifications, is an example of a standard that provides phishing resistance through verifier name binding by choosing an authenticator secret based on the authenticated domain name of the verifier"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 73.0,
+          "answer": "WebAuthn [WebAuthn] is an example of a standard that provides phishing resistance through verifier name binding by choosing an authenticator secret based on the authenticated domain name of the verifier [1].",
+          "raw": "WebAuthn [WebAuthn] is an example of a standard that provides phishing resistance through verifier name binding by choosing an authenticator secret based on the authenticated domain name of the verifier [3].\n\nQuotes:\n[3] \"WebAuthn, which is used by authenticators that implement the Fast Identity Online 2 (FIDO2) specifications, is an example of a standard that provides phishing resistance through verifier name binding by choosing an authenticator secret based on the authenticated domain name of the verifier\""
+        },
+        "nist-41": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 47,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "Personal identity verification (PIV) and common access card (CAC) cards, which use client-authenticated TLS, provide phishing resistance through channel binding"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 53.2,
+          "answer": "Personal identity verification (PIV) and common access card (CAC) cards, which use client-authenticated TLS, provide phishing resistance through channel binding [1].",
+          "raw": "Personal identity verification (PIV) and common access card (CAC) cards, which use client-authenticated TLS, provide phishing resistance through channel binding [1].\n\nQuotes:\n[1] \"Personal identity verification (PIV) and common access card (CAC) cards, which use client-authenticated TLS, provide phishing resistance through channel binding\"\n[1] \"Personal identity verification (PIV) and common access card (CAC) cards, which use client-authenticated TLS, provide phishing resistance through channel binding\""
+        },
+        "nist-44": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 50,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "The potential for such attacks on wireless connections depends on the technology’s effective range. To minimize the attack surface for threats to the authenticator-endpoint connection, the authentication process SHALL require physical proximity between the authenticator and endpoint by establishing a wireless connection with a range of no more than 240 meters",
+                "The limit of 240 meters was chosen based on the maximum expected range of a Bluetooth connection"
+              ],
+              "reasons": [
+                "",
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 63.8,
+          "answer": "The wireless signal used to set up a hybrid connection may reach a distance of no more than 240 meters [1].",
+          "raw": "The wireless signal used to set up a hybrid connection may reach a distance of no more than 240 meters [3].\n\nQuotes:\n[3] \"The potential for such attacks on wireless connections depends on the technology’s effective range. To minimize the attack surface for threats to the authenticator-endpoint connection, the authentication process SHALL require physical proximity between the authenticator and endpoint by establishing a wireless connection with a range of no more than 240 meters.\"\n \n[3] \"The limit of 240 meters was chosen based on the maximum expected range of a Bluetooth connection.\""
+        },
+        "nist-46": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 55,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "To minimize the need for account recovery, CSPs and verifiers SHOULD encourage subscribers to maintain at least two separate means of authentication"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 99,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "a subscriber who usually uses an OTP authenticator as a physical authenticator MAY also be issued look-up secret authenticators or register a device for out-of-band authentication to be used if the physical authenticator is lost, stolen, or damaged"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                55
+              ]
+            },
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 60,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "For example, binding an authenticator that is suitable for use at AAL2 requires authentication at AAL2 unless the subscriber account currently has only AAL1 authentication capabilities"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                55
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 72.5,
+          "answer": "To minimize the need for account recovery, CSPs and verifiers SHOULD encourage subscribers to maintain at least two separate means of authentication [1].",
+          "raw": "To minimize the need for account recovery, CSPs and verifiers SHOULD encourage subscribers to maintain at least two separate means of authentication [1]. \n\nQuotes:\n[1] \"To minimize the need for account recovery, CSPs and verifiers SHOULD encourage subscribers to maintain at least two separate means of authentication\"\n[2] \"a subscriber who usually uses an OTP authenticator as a physical authenticator MAY also be issued look-up secret authenticators or register a device for out-of-band authentication to be used if the physical authenticator is lost, stolen, or damaged\"\n[3] \"For example, binding an authenticator that is suitable for use at AAL2 requires authentication at AAL2 unless the subscriber account currently has only AAL1 authentication capabilities\""
+        },
+        "nist-48": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 59,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "the recovery code SHALL include at least 64 bits from an approved random bit generator"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                58
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 54.5,
+          "answer": "A saved recovery code SHALL include at least 64 bits from an approved random bit generator [1].",
+          "raw": "A saved recovery code SHALL include at least 64 bits from an approved random bit generator [1].\n\nQuotes:\n[1] \"the recovery code SHALL include at least 64 bits from an approved random bit generator\"\n[1] \"the recovery code SHALL include at least 64 bits from an approved random bit generator\""
+        },
+        "nist-49": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 60,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "The issued recovery code may be presented as a numeric or a printable ASCII representation (e.g., Base64) for manual entry, a secure (e.g., https) link with a representation of the recovery code, or a machine-readable optical label (e.g., QR code) that contains the recovery code"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "nist-sp-800-63b-4",
+                59
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 38.6,
+          "answer": "A recovery code sent by email is valid for at most 24 hours [1].",
+          "raw": "A recovery code sent by email is valid for at most 24 hours [2].\n\nQuotes:\n[2] \"The issued recovery code may be presented as a numeric or a printable ASCII representation (e.g., Base64) for manual entry, a secure (e.g., https) link with a representation of the recovery code, or a machine-readable optical label (e.g., QR code) that contains the recovery code.\""
+        },
+        "nist-51": {
+          "answerable": true,
+          "kind": "multi-page",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 63,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "a code sent by text is valid for 10 minutes for logging in"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 8.9,
+          "answer": "A code sent by text is valid for 10 minutes for logging in, compared with 10 minutes for account recovery [1].",
+          "raw": "A code sent by text is valid for 10 minutes for logging in, compared with 10 minutes for account recovery [3].\n\nQuotes:\n[3] \"a code sent by text is valid for 10 minutes for logging in\""
+        },
+        "nist-53": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 64,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent",
+                "i.e. retained across a restart of the associated application or a reboot of the host device"
+              ],
+              "reasons": [
+                "",
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 82.7,
+          "answer": "Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end [1].",
+          "raw": "Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent (i.e., retained across a restart of the associated application or a reboot of the host device) because they are tied to specific sessions that a restart or reboot would end [1]. \n\nQuotes:\n[1] \"Session secrets that are used as bearer tokens for session management SHOULD NOT be persistent\"\n[1] \"i.e. retained across a restart of the associated application or a reboot of the host device\""
+        },
+        "nist-54": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 129,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "Session cookies SHOULD set “SameSite=Lax” or “SameSite=Strict"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 74.7,
+          "answer": "Session cookies SHOULD set “SameSite=Lax” or “SameSite=Strict” [5.1.1] [1].",
+          "raw": "Session cookies SHOULD set “SameSite=Lax” or “SameSite=Strict” [5.1.1] [2].\n\nQuotes:\n[5.1.1] \"Session cookies SHOULD set “SameSite=Lax” or “SameSite=Strict”\"\n[2] \"Session cookies SHOULD set “SameSite=Lax” or “SameSite=Strict”\""
+        },
+        "nist-57": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 67,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "Session activity SHALL reset the inactivity timeout, and successful reauthentication during a session SHALL reset both timeouts"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 55.2,
+          "answer": "Session activity SHALL reset the inactivity timeout, and successful reauthentication during a session SHALL reset both timeouts [1].",
+          "raw": "Session activity SHALL reset the inactivity timeout, and successful reauthentication during a session SHALL reset both timeouts [1]. \n\nQuotes:\n[1] \"Session activity SHALL reset the inactivity timeout, and successful reauthentication during a session SHALL reset both timeouts\""
+        },
+        "nist-59": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 68,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "behavioral biometric characteristics (e.g., typing cadence)"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 2,
+          "supported": 1,
+          "seconds": 72.2,
+          "answer": "Session monitoring (sometimes called continuous authentication) is the ongoing evaluation of session characteristics to detect possible fraud during a session. Session characteristics that MAY be evaluated include: behavioral biometric characteristics (e.g., typing cadence) [1].",
+          "raw": "Session monitoring (sometimes called continuous authentication) is the ongoing evaluation of session characteristics to detect possible fraud during a session. Session characteristics that MAY be evaluated include: behavioral biometric characteristics (e.g., typing cadence) [1].\n\nQuotes:\n[1] \"behavioral biometric characteristics (e.g., typing cadence)\""
+        },
+        "qasper-02": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 2,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 145.4,
+          "answer": "Each paper has an average of 3.2 questions, up to a maximum of 12 questions for a single paper [1].",
+          "raw": "Each paper has an average of 3.2 questions, up to a maximum of 12 questions for a single paper [3]."
+        },
+        "qasper-04": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 118.8,
+          "answer": "The workers were paid US$25 per hour on average ($20-$40 based on experience), and they were paid on a per-hour basis to prioritize data quality over quantity, A total of 25 workers wrote questions while 51 answered them,",
+          "raw": "The workers were paid US$25 per hour on average ($20-$40 based on experience), and they were paid on a per-hour basis to prioritize data quality over quantity, A total of 25 workers wrote questions while 51 answered them,"
+        },
+        "qasper-06": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 1,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 102.4,
+          "answer": "The dataset was built from a collection of open-access papers, specifically from S2ORC (Lo et al., 2020), which was filtered to include only papers from arXiv with an associated LaTeX source file, and limited to the computational linguistics domain [1].",
+          "raw": "The dataset was built from a collection of open-access papers, specifically from S2ORC (Lo et al., 2020), which was filtered to include only papers from arXiv with an associated LaTeX source file, and limited to the computational linguistics domain [2]."
+        },
+        "qasper-09": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 3,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "most of the questions (67%) are specific to the papers they are written about"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 6,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "when multiple paragraphs could serve as evidence, annotators were asked to first prioritize evidence that adequately answered the question, and then paragraphs that occurred earlier in the text"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "qasper-2105.03011v1",
+                3
+              ]
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 1,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "the annotators were also asked to provide a concise answer to the question, and to indicate whether their concise answer was extracted from the evidence, \"yes\" or \"no\", or abstractively written"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 3,
+          "supported": 1,
+          "seconds": 201.3,
+          "answer": "The annotators were instructed to only write questions that are not answerable from the title and abstract but expected to be answered somewhere in the paper, and most questions (67%) are specific to the papers they are written about, indicating that the annotators were able to identify questions that require context beyond the title and abstract, [1]. \n\nThe annotators were also asked to prioritize text over figures and tables, unless the information required was present only in figures or tables, and when multiple paragraphs could serve as evidence, annotators were asked to first prioritize evidence that adequately answered the question, and then paragraphs that occurred earlier in the text, [2]. \n\nThe annotators were also asked to provide a concise answer to the question, and to indicate whether their concise answer was extracted from the evidence, \"yes\" or \"no\", or abstractively written, [3].",
+          "raw": "The annotators were instructed to only write questions that are not answerable from the title and abstract but expected to be answered somewhere in the paper, and most questions (67%) are specific to the papers they are written about, indicating that the annotators were able to identify questions that require context beyond the title and abstract, [1]. \n\nThe annotators were also asked to prioritize text over figures and tables, unless the information required was present only in figures or tables, and when multiple paragraphs could serve as evidence, annotators were asked to first prioritize evidence that adequately answered the question, and then paragraphs that occurred earlier in the text, [2]. \n\nThe annotators were also asked to provide a concise answer to the question, and to indicate whether their concise answer was extracted from the evidence, \"yes\" or \"no\", or abstractively written, [3]. \n\nQuotes:\n[1] \"most of the questions (67%) are specific to the papers they are written about\"\n[2] \"when multiple paragraphs could serve as evidence, annotators were asked to first prioritize evidence that adequately answered the question, and then paragraphs that occurred earlier in the text\"\n[3] \"the annotators were also asked to provide a concise answer to the question, and to indicate whether their concise answer was extracted from the evidence, \"yes\" or \"no\", or abstractively written\""
+        },
+        "qasper-10": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 3,
+              "verified": true,
+              "needed_folding": false,
+              "quotes": [
+                "The average length of the extractive answers is 14.4 words"
+              ],
+              "reasons": [
+                ""
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 4,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "The average length of the extractive answers is 14.4 words"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "qasper-2105.03011v1",
+                3
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 1,
+          "seconds": 114.9,
+          "answer": "The average length of extractive answers is 14.4 words [1].",
+          "raw": "The average length of extractive answers is 14.4 words [2]. \nQuotes:\n[2] \"The average length of the extractive answers is 14.4 words\"\n[3] \"The average length of the extractive answers is 14.4 words\"\n[4] \"The average length of the extractive answers is 14.4 words\""
+        },
+        "qasper-13": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [],
+          "dropped": [
+            4
+          ],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 120.3,
+          "answer": "According to the provided pages, 75.8% of the answers were correct, and 98% of the questions had at least one correct answer, with 77% having most of the answers correct .",
+          "raw": "According to the provided pages, 75.8% of the answers were correct, and 98% of the questions had at least one correct answer, with 77% having most of the answers correct [4]."
+        },
+        "qasper-16": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 7,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 108.2,
+          "answer": "The Longformer-Encoder-Decoder (LED) model is used in the baseline system, which is based on a Transformer model that can process long inputs, addressing the challenge of research papers being much longer than the typical token limit of most BERT-like models [1].",
+          "raw": "The Longformer-Encoder-Decoder (LED) model is used in the baseline system, which is based on a Transformer model that can process long inputs, addressing the challenge of research papers being much longer than the typical token limit of most BERT-like models [3]."
+        },
+        "qasper-18": {
+          "answerable": true,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 9,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 90.2,
+          "answer": "The experiments were run on a single RTX 8000 GPU [1].",
+          "raw": "The experiments were run on a single RTX 8000 GPU [3]."
+        },
+        "qasper-20": {
+          "answerable": true,
+          "kind": "table",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 7,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "26.07 Answer-F1"
+              ],
+              "reasons": [
+                "shorter than 5 words"
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 5,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "the full-text model with the evidence scaffold reached an Answer-F1 of 26.07"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 3,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "26.07 Answer-F1 on the dev. set while varying training data size"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 89.6,
+          "answer": "The full-text model with the evidence scaffold reached an Answer-F1 of 26.07 [1].",
+          "raw": "The full-text model with the evidence scaffold reached an Answer-F1 of 26.07 [1].\n\nQuotes:\n[1] \"26.07 Answer-F1\"\n[2] \"the full-text model with the evidence scaffold reached an Answer-F1 of 26.07\"\n[3] \"26.07 Answer-F1 on the dev. set while varying training data size\""
+        },
+        "qasper-22": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 7,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 110.6,
+          "answer": "The model sampled 67 test questions with predicted Answer-F1 scores below 0.10 from the LED model trained with evidence prediction scaffolding [1].",
+          "raw": "The model sampled 67 test questions with predicted Answer-F1 scores below 0.10 from the LED model trained with evidence prediction scaffolding [2]."
+        },
+        "qasper-24": {
+          "answerable": true,
+          "kind": "table",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 2,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [],
+              "reasons": [],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 5,
+          "supported": 0,
+          "seconds": 100.7,
+          "answer": "The T5-large model answers best when it is given the gold evidence [1]. \nThe T5-large model answers better in the oracle setting [1]. \nThe UnifiedQA-large model answers better in the oracle setting [1]. \nThese experiments show that large models exceed the human lower bound for span answers in this setting [1]. \nThese experiments show that the majority of the large headroom in the non-oracle setting can be closed with better evidence selection [1].",
+          "raw": "The T5-large model answers best when it is given the gold evidence [2]. \nThe T5-large model answers better in the oracle setting [2]. \nThe UnifiedQA-large model answers better in the oracle setting [2]. \nThese experiments show that large models exceed the human lower bound for span answers in this setting [2]. \nThese experiments show that the majority of the large headroom in the non-oracle setting can be closed with better evidence selection [2]."
+        },
+        "qasper-25": {
+          "answerable": true,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 1,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "PubmedQA and BioAsq contain 1K and 3.2K questions, respectively"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": [
+                "qasper-2105.03011v1",
+                8
+              ]
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 104.4,
+          "answer": "QASPER contains 5,049 questions, while PubmedQA and BioAsq contain 1,000 and 3,200 questions, respectively [1].",
+          "raw": "QASPER contains 5,049 questions, while PubmedQA and BioAsq contain 1,000 and 3,200 questions, respectively [2].\n\n\nQuotes:\n[2] \"PubmedQA and BioAsq contain 1K and 3.2K questions, respectively\""
+        },
+        "un-03": {
+          "answerable": false,
+          "kind": "paraphrase",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 58.4,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "un-05": {
+          "answerable": false,
+          "kind": "lexical",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 90,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "fax is not considered a secure communication channel",
+                "fax transmissions may be vulnerable to interception or eavesdropping"
+              ],
+              "reasons": [
+                "not found on the page",
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 55.2,
+          "answer": "According to NIST SP 800-63B-4, authentication codes may not be sent via fax because fax is not considered a secure communication channel, and fax transmissions may be vulnerable to interception or eavesdropping [1].",
+          "raw": "According to NIST SP 800-63B-4, authentication codes may not be sent via fax because fax is not considered a secure communication channel, and fax transmissions may be vulnerable to interception or eavesdropping [3].\n\nQuotes:\n[3] \"fax is not considered a secure communication channel\"\n[3] \"fax transmissions may be vulnerable to interception or eavesdropping\""
+        },
+        "un-08": {
+          "answerable": false,
+          "kind": "paraphrase",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 97.6,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "un-09": {
+          "answerable": false,
+          "kind": "lexical",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 70.8,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "un-11": {
+          "answerable": false,
+          "kind": "scanned",
+          "not_found": true,
+          "citations": [],
+          "dropped": [],
+          "sentences": 0,
+          "supported": 0,
+          "seconds": 43.3,
+          "answer": "NOT_FOUND",
+          "raw": "NOT_FOUND"
+        },
+        "un-12": {
+          "answerable": false,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "nist-sp-800-63b-4",
+              "page": 99,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "users often reuse passwords across multiple sites, often using variations of the same password across different sites"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 60.4,
+          "answer": "The average person reuses passwords across sites, with estimates suggesting that many users reuse passwords across multiple sites, often using variations of the same password across different sites, which can make it easier for attackers to gain access to an account on one site by using the same password on another site [1].",
+          "raw": "The average person reuses passwords across sites, with estimates suggesting that many users reuse passwords across multiple sites, often using variations of the same password across different sites, which can make it easier for attackers to gain access to an account on one site by using the same password on another site [3].\n\nQuotes:\n[3] \"users often reuse passwords across multiple sites, often using variations of the same password across different sites\""
+        },
+        "un-16": {
+          "answerable": false,
+          "kind": "paraphrase",
+          "not_found": false,
+          "citations": [
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 2,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "the tank holds 40 litres of water when full"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            },
+            {
+              "doc": "qasper-2105.03011v1",
+              "page": 3,
+              "verified": false,
+              "needed_folding": false,
+              "quotes": [
+                "the tank is refilled every Monday morning"
+              ],
+              "reasons": [
+                "not found on the page"
+              ],
+              "quote_on": null
+            }
+          ],
+          "dropped": [],
+          "sentences": 1,
+          "supported": 0,
+          "seconds": 87.9,
+          "answer": "According to the provided pages, a total of 25 workers wrote questions, and 51 workers answered questions, but the number of workers who wrote the most questions is not specified in the provided pages, so I cannot answer this question based on the given information [1].",
+          "raw": "According to the provided pages, a total of 25 workers wrote questions, and 51 workers answered questions, but the number of workers who wrote the most questions is not specified in the provided pages, so I cannot answer this question based on the given information [1].\n\nQuotes:\n[1] \"the tank holds 40 litres of water when full\"\n[2] \"the tank is refilled every Monday morning\""
+        }
+      },
+      "release": "v0.1.0"
     }
   }
 }

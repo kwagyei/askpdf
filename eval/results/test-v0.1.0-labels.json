@@ -1,0 +1,275 @@
+{
+  "release": "v0.1.0",
+  "split": "test",
+  "answers": "eval/results/test-v0.1.0.json (stage answers)",
+  "rules": "eval/LABELS.md",
+  "labeller": "Claude (AI model, the project's lead developer); one labeller, no second rater",
+  "date": "2026-11-03",
+  "labels": {
+    "naca-02": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Names George W. Jones, Jr., as the evidence does."
+    },
+    "naca-04": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Above the 0- and 30-degree wings near Mach 0.8, as page 2 says; the extra detail on the rise also matches."
+    },
+    "naca-06": {
+      "label": "correct",
+      "cause": null,
+      "reason": "26 inches between flats."
+    },
+    "naca-08": {
+      "label": "abstained",
+      "cause": "retrieval",
+      "reason": "NOT_FOUND; page 6 with the weight was not among the 3 pages."
+    },
+    "naca-10": {
+      "label": "correct",
+      "cause": null,
+      "reason": "A recording oscillograph."
+    },
+    "nist-02": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Says it does not change the AAL; the second sentence is a paraphrase, not a contradiction."
+    },
+    "nist-05": {
+      "label": "partial",
+      "cause": "reading",
+      "reason": "1 hour is right, but it says SHALL where the standard says SHOULD."
+    },
+    "nist-06": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Not an authenticator on its own; right although no evidence page was among the 3."
+    },
+    "nist-09": {
+      "label": "abstained",
+      "cause": "retrieval",
+      "reason": "NOT_FOUND; neither evidence page was among the 3."
+    },
+    "nist-10": {
+      "label": "correct",
+      "cause": null,
+      "reason": "No more than 12 hours."
+    },
+    "nist-13": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Not required at AAL1; the added recommendation of multi-factor options at AAL1 is on pages 13 and 15."
+    },
+    "nist-15": {
+      "label": "wrong",
+      "cause": "retrieval",
+      "reason": "Says 4 characters; the standard says at least 8. The evidence page was not among the 3."
+    },
+    "nist-17": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SHALL NOT prompt for knowledge-based authentication."
+    },
+    "nist-19": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Verifiers SHALL allow them."
+    },
+    "nist-21": {
+      "label": "correct",
+      "cause": null,
+      "reason": "At least six decimal digits."
+    },
+    "nist-22": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Once; it says the list rather than one code is used once, but the answer to the question is right."
+    },
+    "nist-25": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SHOULD NOT display it while locked."
+    },
+    "nist-27": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Does not reset the count."
+    },
+    "nist-29": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Not required; the sentence repeats itself but does not contradict the standard."
+    },
+    "nist-30": {
+      "label": "abstained",
+      "cause": "retrieval",
+      "reason": "NOT_FOUND; page 41 with the limit of 100 was not among the 3."
+    },
+    "nist-32": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SHOULD disregard previous failed attempts."
+    },
+    "nist-35": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SHALL always be provided."
+    },
+    "nist-36": {
+      "label": "correct",
+      "cause": null,
+      "reason": "At least 30 seconds; the extra limits (50, or 100 with PAD) match page 44."
+    },
+    "nist-39": {
+      "label": "correct",
+      "cause": null,
+      "reason": "WebAuthn."
+    },
+    "nist-41": {
+      "label": "correct",
+      "cause": null,
+      "reason": "PIV and CAC cards."
+    },
+    "nist-44": {
+      "label": "correct",
+      "cause": null,
+      "reason": "No more than 240 meters."
+    },
+    "nist-46": {
+      "label": "correct",
+      "cause": null,
+      "reason": "At least two."
+    },
+    "nist-48": {
+      "label": "correct",
+      "cause": null,
+      "reason": "At least 64 bits from an approved random bit generator."
+    },
+    "nist-49": {
+      "label": "correct",
+      "cause": null,
+      "reason": "At most 24 hours."
+    },
+    "nist-51": {
+      "label": "correct",
+      "cause": null,
+      "reason": "10 minutes in both cases, which is what the two evidence pages say."
+    },
+    "nist-53": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SHOULD NOT be persistent across a restart or reboot."
+    },
+    "nist-54": {
+      "label": "correct",
+      "cause": null,
+      "reason": "SameSite=Lax or Strict."
+    },
+    "nist-57": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Activity resets the inactivity timeout only; reauthentication resets both. Answers the question without saying no outright."
+    },
+    "nist-59": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Yes: typing cadence MAY be evaluated."
+    },
+    "qasper-02": {
+      "label": "correct",
+      "cause": null,
+      "reason": "3.2 on average; the maximum of 12 is also on page 2."
+    },
+    "qasper-04": {
+      "label": "correct",
+      "cause": null,
+      "reason": "US$25 an hour on average."
+    },
+    "qasper-06": {
+      "label": "correct",
+      "cause": null,
+      "reason": "S2ORC."
+    },
+    "qasper-09": {
+      "label": "wrong",
+      "cause": "reading",
+      "reason": "Talks about how annotators wrote questions; never gives the agreement (Cohen's kappa 0.94), although the page was given."
+    },
+    "qasper-10": {
+      "label": "correct",
+      "cause": null,
+      "reason": "14.4 words."
+    },
+    "qasper-13": {
+      "label": "correct",
+      "cause": null,
+      "reason": "75.8%."
+    },
+    "qasper-16": {
+      "label": "correct",
+      "cause": null,
+      "reason": "The Longformer-Encoder-Decoder (LED)."
+    },
+    "qasper-18": {
+      "label": "correct",
+      "cause": null,
+      "reason": "A single RTX 8000."
+    },
+    "qasper-20": {
+      "label": "wrong",
+      "cause": "reading",
+      "reason": "Says 26.07, the extractive dev score of the model without the scaffold; the overall test score with it is 33.63."
+    },
+    "qasper-22": {
+      "label": "correct",
+      "cause": null,
+      "reason": "67 questions."
+    },
+    "qasper-24": {
+      "label": "wrong",
+      "cause": "retrieval",
+      "reason": "Names T5-large, then UnifiedQA-large as well; the evidence table (page 8) was not among the 3."
+    },
+    "qasper-25": {
+      "label": "correct",
+      "cause": null,
+      "reason": "1,000 and 3,200."
+    },
+    "un-03": {
+      "label": "correct",
+      "cause": null,
+      "reason": "NOT_FOUND."
+    },
+    "un-05": {
+      "label": "wrong",
+      "cause": "abstention",
+      "reason": "Says codes may not be sent by fax; the standard never mentions fax."
+    },
+    "un-08": {
+      "label": "correct",
+      "cause": null,
+      "reason": "NOT_FOUND."
+    },
+    "un-09": {
+      "label": "correct",
+      "cause": null,
+      "reason": "NOT_FOUND."
+    },
+    "un-11": {
+      "label": "correct",
+      "cause": null,
+      "reason": "NOT_FOUND."
+    },
+    "un-12": {
+      "label": "wrong",
+      "cause": "abstention",
+      "reason": "Answers from general knowledge; no document gives a number."
+    },
+    "un-16": {
+      "label": "correct",
+      "cause": null,
+      "reason": "Says the pages do not say, in words rather than NOT_FOUND (the automatic abstention score counts it as answered)."
+    }
+  }
+}
