@@ -15,7 +15,7 @@ import math
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 
 SOFT_HYPHEN = "\u00ad"
@@ -34,8 +34,7 @@ MIN_PAGES = 4
 _WHITESPACE = re.compile("[ \\t\\f\\v\\u00a0\\u2000-\\u200a\\u202f\\u205f\\u3000]+")
 # Lexicon tokens: runs of letters, joined by internal hyphens ("out-of-band").
 _WORD = re.compile(r"[^\W\d_]+(?:[-\u2010][^\W\d_]+)*")
-# The token that ends at a line-end hyphen, and the one that starts the next line.
-_TAIL = re.compile(r"[\w\-\u2010]*\Z")
+# The token that starts the line after a line-end hyphen.
 _HEAD = re.compile(r"\w+")
 _DIGITS = re.compile(r"\d+")
 
@@ -95,6 +94,10 @@ def _ends_with_break(line: str, following: str) -> bool:
     )
 
 
+def _is_word(ch: str) -> bool:
+    return ch.isalnum() or ch == "_"  # exactly the regex \w on str
+
+
 def _fold(word: str) -> str:
     return word.casefold().replace("\u2010", "-")
 
@@ -138,19 +141,68 @@ class Lexicon:
         return self.words[left + right] > self.pairs[f"{left}-{right}"]
 
 
-def _join(line: str, following: str, lexicon: Lexicon) -> tuple[str, bool]:
+class _Line:
+    """An output line built from joined input lines.
+
+    The pieces are joined once, at the end: joining at every break would copy the
+    growing line each time, quadratic in a long chain of broken lines.
+    """
+
+    def __init__(self, text: str) -> None:
+        self.pieces = [text]
+
+    def reversed_chars(self) -> Iterator[str]:
+        for piece in reversed(self.pieces):
+            yield from reversed(piece)
+
+    def last(self, n: int) -> str:
+        """The last ``n`` characters, or fewer if the line is shorter."""
+        return "".join(itertools.islice(self.reversed_chars(), n))[::-1]
+
+    def text(self) -> str:
+        return "".join(self.pieces)
+
+
+def _left_word(line: _Line) -> str | None:
+    """The word before the line-end hyphen, leading hyphens stripped; None if the word
+    holds a hyphen itself ("out-of-" + "band"), which is never dropped.
+
+    It walks back from the hyphen, so the cost is the length of that word, not the line:
+    a regex anchored at the line end backtracks from every position (quadratic).
+    """
+    chars = line.reversed_chars()
+    next(chars)  # the hyphen itself
+    word: list[str] = []
+    for ch in chars:
+        if ch in HYPHENS:
+            for before in chars:
+                if before not in HYPHENS:
+                    # A word character before the hyphens makes them part of the word;
+                    # anything else ends the word, and they are stripped as leading.
+                    return None if _is_word(before) else "".join(reversed(word))
+            break
+        if not _is_word(ch):
+            break
+        word.append(ch)
+    return "".join(reversed(word))
+
+
+def _join(line: _Line, following: str, lexicon: Lexicon) -> bool:
     """Join a line ending in a hyphen to the next; say whether the hyphen was dropped."""
-    # Both always match: _TAIL may match empty, and `following` starts with a letter or
-    # digit. findall()[0] is the first match without an Optional to unwrap.
-    left_word = _TAIL.findall(line[:-1])[0].lstrip(HYPHENS)
-    right_word = _HEAD.findall(following)[0]
+    before_hyphen = line.last(2)[0]
+    left_word = _left_word(line)
+    head = _HEAD.match(following)  # always matches: `following` starts with a letter or digit
     drop = (
-        line[-2].isalpha()
+        before_hyphen.isalpha()
         and following[0].islower()
-        and not any(h in left_word for h in HYPHENS)
-        and lexicon.prefers_solid(left_word, right_word)
+        and left_word is not None
+        and head is not None
+        and lexicon.prefers_solid(left_word, head.group())
     )
-    return (line[:-1] if drop else line) + following, drop
+    if drop:
+        line.pieces[-1] = line.pieces[-1][:-1]
+    line.pieces.append(following)
+    return drop
 
 
 def resolve_hyphens(
@@ -171,16 +223,17 @@ def resolve_hyphens(
     resolved = []
     for n, page in enumerate(pages):
         keep_apart = protected[n] if protected is not None else set()
-        out: list[str] = []
+        out: list[_Line] = []
         last_protected = False  # whether out[-1] holds a protected line
         for i, line in enumerate(page.split("\n")):
             joinable = out and not last_protected and i not in keep_apart
-            if joinable and _ends_with_break(out[-1], line):
-                out[-1], _ = _join(out[-1], line, lexicon)
+            if joinable and _ends_with_break(out[-1].last(2), line):
+                _join(out[-1], line, lexicon)
             else:
-                out.append(line)
+                out.append(_Line(line))
                 last_protected = i in keep_apart
-        resolved.append(unicodedata.normalize("NFC", "\n".join(out)))
+        text = "\n".join(line.text() for line in out)
+        resolved.append(unicodedata.normalize("NFC", text))
     return resolved
 
 
