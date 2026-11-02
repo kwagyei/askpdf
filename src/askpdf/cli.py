@@ -419,6 +419,10 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, "--release goes with --split test only")
     if args.check and args.split != "test":
         return _error(err, "--check goes with --split test --release vX.Y.Z")
+    if args.check and args.stage not in ("retrieval", "conversation"):
+        # The answers stage needs the model and is never rerun: that would answer the
+        # frozen questions again, for numbers that differ between machines anyway.
+        return _error(err, "--check covers the model-free stages: retrieval and conversation")
     release_file, release = None, None
     if args.split == "test":
         if not RELEASE.fullmatch(args.release or ""):
@@ -1067,7 +1071,10 @@ def cmd_bench(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             return _error(err, f"{exc}; answers need Ollama running (or pass --answers 0)")
     print(json.dumps(result, indent=2, ensure_ascii=False), file=out)
     if args.json:
-        _write_json(args.json, result)
+        try:
+            _write_json(args.json, result)
+        except OSError as exc:
+            return _error(err, f"cannot write {args.json}: {exc.strerror or exc}")
     return 0
 
 

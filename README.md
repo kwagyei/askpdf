@@ -22,7 +22,8 @@ askpdf ~/Documents/papers        # indexes the folder, watches it, opens the bro
 ```
 
 Without Ollama, indexing and keyword search still work, and askpdf says why answers are
-not available. On a laptop without a GPU an answer takes about a minute (measured below).
+not available. On a laptop without a GPU an answer takes one to three minutes (measured
+below).
 
 ### From the command line
 
@@ -202,8 +203,9 @@ so a bad answer can be traced to where it went wrong:
 Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
 once per release. Questions from the Qasper dataset, written by people who had seen only
 a paper's title and abstract, were planned as an outside check but were cut to ship
-sooner; the limitations below say what that leaves. A CI job reruns every model-free number below, checks these tables against the results
-files, and fails if a number changes without them.
+sooner; the limitations below say what that leaves. A CI job reruns every model-free number below (extraction, retrieval and follow-ups, on dev
+and on the frozen test split), checks these tables against the results files, and fails if
+a number changes without them. Numbers that need the model are run by hand and committed.
 
 ### First results (development split, model-free)
 
@@ -259,7 +261,7 @@ These need Ollama, so they are run by hand on the development Mac (Intel, no GPU
 committed, not rerun in CI. Every reply is kept in `eval/results/dev-answers.json`.
 
 <!-- results:answers -->
-Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each:
+Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each; MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU, 2026-10-31:
 
 | Measure | Result |
 | --- | --- |
@@ -289,7 +291,7 @@ workflow rescores its model-free stages from the tagged commit and refuses to pu
 the release unless they match exactly.
 
 <!-- results:test-split -->
-BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets:
+BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets. Answers from llama3.2:3b (Ollama 0.40.5) on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; test split scored 2026-11-02.
 
 | Measure | dev (tuned on) | test, v0.1.0 (scored once) |
 | --- | --- | --- |
@@ -330,6 +332,10 @@ Each of the 53 test answers labelled by hand against its evidence, by the rules 
 Of the 8 answerable questions not answered correctly, 5 never had the page with the answer among the 3 pages the model read, and 3 had it and misread it.
 <!-- /results -->
 
+Two of the 38 correct answers came from the model's own knowledge: none of the 3 pages it
+read held the evidence (`nist-06`, `nist-22`). They count as correct because the labels
+judge the answer, but askpdf could not have shown where they came from.
+
 One difference from the automatic count above: it scores 3 unanswerable questions as
 answered, but one of those replies says in words that the pages do not say, which counts
 as declining here.
@@ -344,7 +350,7 @@ with the answer was not among the 3 it was given.
 <!-- results:latency -->
 `askpdf bench` on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; llama3.2:3b on Ollama 0.40.5, 2026-11-02:
 
-| Step | n | p50 | p95 |
+| Step | n | p50 | p95 (the slowest, when n < 20) |
 | --- | --- | --- | --- |
 | Index one document (extract, clean, chunk, store) | 12 | 0.70 s | 6.25 s |
 | Keyword search over the corpus | 174 | 0.21 ms | 0.40 ms |
@@ -352,7 +358,7 @@ with the answer was not among the 3 it was given.
 | Answer, warm: checked answer shown | 9 | 66 s | 185 s |
 | Answer, cold (model loaded first): first token / shown | 1 | 89 s / 98 s | |
 
-Indexing ran at 20.5 pages a second over 4 documents (3 runs); embedding for search by meaning is extra. The pages to be read are shown in under 0.05 s; nearly all of the wait is the model reading them.
+Indexing ran at 20.5 pages a second over 4 documents (3 runs); embedding for search by meaning is extra. The pages to be read are shown in under 0.05 s; nearly all of the wait is the model reading them. Ollama is given a context window sized to each prompt, and may reload the model when that size changes, so some warm times may include a reload.
 <!-- /results -->
 
 **Who wrote the evaluation data.** The questions, conversations and page transcriptions
