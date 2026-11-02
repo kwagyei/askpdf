@@ -10,12 +10,13 @@ import json
 import os
 import sqlite3
 import sys
+import threading
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, BinaryIO
 
 SCHEMA_VERSION = 2  # 2: chunk ids are never reused
 
@@ -176,10 +177,39 @@ class WrongFolderError(Exception):
     """The index belongs to another folder; reusing it would wipe that folder's index."""
 
 
+class IndexBusyError(Exception):
+    """Another askpdf process is writing this index."""
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     db.execute("PRAGMA foreign_keys = ON")
     return db
+
+
+def _write_schema(db: sqlite3.Connection) -> None:
+    """Create the tables, inside the caller's transaction."""
+    # Statement by statement: executescript() would commit the open transaction.
+    for statement in _SCHEMA.split(";"):
+        if statement.strip():
+            db.execute(statement)
+    for key, value in (("app", "askpdf"), ("generation", 0)):
+        db.execute("INSERT INTO meta VALUES (?, ?)", (key, json.dumps(value)))
+    db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _try_lock(file: BinaryIO) -> None:
+        file.seek(0)
+        msvcrt.locking(file.fileno(), msvcrt.LK_NBLCK, 1)
+
+else:
+    import fcntl
+
+    def _try_lock(file: BinaryIO) -> None:
+        fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
 def _is_askpdf_index(db: sqlite3.Connection) -> bool:
@@ -220,37 +250,74 @@ class Store:
             raise OutdatedIndexError(f"{path} was made by another version of askpdf")
         if version != SCHEMA_VERSION:
             # An index from another schema version. It is a cache of the folder, so it is
-            # replaced, never migrated.
-            self._db.close()
-            self._create(path)
-            self._db = _connect(path)
+            # rebuilt, never migrated: in place, because another process may have it open.
+            self._rebuild()
 
     @staticmethod
     def _create(path: Path) -> None:
-        """Build the index in a temporary file and move it into place.
+        """Build the index in a temporary file and link it into place.
 
         A crash or Ctrl-C halfway leaves only the temporary file, never a half-made
-        index that later runs would refuse as "not an askpdf index".
+        index that later runs would refuse as "not an askpdf index". The link fails if
+        another process created the index first, and then that one is used: replacing it
+        would silently lose whatever the other process writes into it.
         """
-        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        # Per process and thread: two creators must never share (and unlink) one file.
+        tmp = path.with_name(f".{path.name}.{os.getpid()}-{threading.get_ident()}.tmp")
         tmp.unlink(missing_ok=True)
         db = sqlite3.connect(tmp, isolation_level=None)
         try:
             db.execute("BEGIN")
-            # Statement by statement: executescript() would commit the open transaction.
-            for statement in _SCHEMA.split(";"):
-                if statement.strip():
-                    db.execute(statement)
-            for key, value in (("app", "askpdf"), ("generation", 0)):
-                db.execute("INSERT INTO meta VALUES (?, ?)", (key, json.dumps(value)))
-            db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            _write_schema(db)
             db.execute("COMMIT")
             db.execute("PRAGMA journal_mode = WAL")
         finally:
             db.close()
-        for suffix in ("-wal", "-shm"):
-            Path(f"{path}{suffix}").unlink(missing_ok=True)
-        os.replace(tmp, path)
+        try:
+            os.link(tmp, path)
+        except FileExistsError:
+            pass  # another process won the race
+        except OSError:
+            # A filesystem without hard links (FAT, some network shares): no atomic
+            # create-if-absent, so fall back to a plain move.
+            if not path.exists():
+                os.replace(tmp, path)
+        tmp.unlink(missing_ok=True)
+
+    def _rebuild(self) -> None:
+        """Replace every table with an empty current schema, in one transaction."""
+        self._db.execute("PRAGMA foreign_keys = OFF")  # dropping in any order
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            tables = self._db.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+            for (name,) in tables:
+                self._db.execute(f'DROP TABLE "{name}"')  # names come from sqlite_master
+            _write_schema(self._db)
+        except BaseException:
+            self._db.execute("ROLLBACK")
+            raise
+        self._db.execute("COMMIT")
+        self._db.execute("PRAGMA foreign_keys = ON")
+
+    @contextmanager
+    def writing(self) -> Iterator[None]:
+        """Hold this index's writer lock: one askpdf process writes an index at a time.
+
+        Raises IndexBusyError at once if another process holds it. The lock is an OS
+        file lock, so it is released when the process ends, however it ends.
+        """
+        lock = open(f"{self.path}.lock", "a+b")  # noqa: SIM115 - held until released
+        try:
+            _try_lock(lock)
+        except OSError as exc:
+            lock.close()
+            raise IndexBusyError(f"another askpdf is writing the index at {self.path}") from exc
+        try:
+            yield
+        finally:
+            lock.close()  # closing the file releases the lock
 
     def close(self) -> None:
         self._db.close()

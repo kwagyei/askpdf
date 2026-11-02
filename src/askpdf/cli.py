@@ -16,6 +16,7 @@ import secrets
 import socket
 import sqlite3
 import sys
+import threading
 import unicodedata
 import webbrowser
 from collections.abc import Callable, Mapping, Sequence
@@ -36,7 +37,7 @@ from askpdf.answer import (
 )
 from askpdf.chunking import ChunkParams
 from askpdf.extract.pypdf_ext import PypdfExtractor
-from askpdf.indexer import build_records, embed_missing, index_folder, pins
+from askpdf.indexer import build_records, embed_missing, index_folder, own_files, pins
 from askpdf.pagelookup import find_page
 from askpdf.providers import http, ollama, openai_compat
 from askpdf.providers.base import ChatModel
@@ -54,6 +55,7 @@ from askpdf.retrieve import (
 )
 from askpdf.snapshot import Snapshot
 from askpdf.store import (
+    IndexBusyError,
     NotAnIndexError,
     OutdatedIndexError,
     Store,
@@ -61,6 +63,7 @@ from askpdf.store import (
     default_index_path,
     folder_key,
 )
+from askpdf.watch import POLL_SECONDS, listing, watch
 
 if TYPE_CHECKING:
     from askpdf.web.app import Progress  # imported only by serve, at run time
@@ -246,12 +249,18 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return 1
     with store:
         try:
-            report = index_folder(
-                args.path,
-                store,
-                PypdfExtractor(),
-                ChunkParams(),
-                on_file=lambda rel: print(f"reading {shown(rel)}", file=err),
+            with store.writing():
+                report = index_folder(
+                    args.path,
+                    store,
+                    PypdfExtractor(),
+                    ChunkParams(),
+                    on_file=lambda rel: print(f"reading {shown(rel)}", file=err),
+                )
+                embedded = _embed(args, store, err)
+        except IndexBusyError:
+            return _error(
+                err, "the index is busy: another askpdf is indexing or serving this folder"
             )
         except WrongFolderError as exc:
             return _error(err, f"{exc}; pass a different --index")
@@ -259,7 +268,6 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             if "locked" in str(exc) or "busy" in str(exc):
                 return _error(err, "the index is busy (another askpdf is indexing)")
             return _error(err, f"index error: {exc}")
-        embedded = _embed(args, store, err)
     if report.rebuilt:
         print("settings changed since the last run: rebuilt the index", file=err)
     for rel, reason in sorted(report.failed.items()):
@@ -290,14 +298,20 @@ def _embedder(args: argparse.Namespace) -> OllamaEmbedder:
     return OllamaEmbedder(url)
 
 
-def _embed(args: argparse.Namespace, store: Store, err: TextIO) -> int | None:
+def _embed(
+    args: argparse.Namespace,
+    store: Store,
+    err: TextIO,
+    on_batch: Callable[[int, int], None] | None = None,
+) -> int | None:
     """Embed the chunks that have no vector yet; None if that was not possible."""
+    if on_batch is None:
+
+        def on_batch(done: int, total: int) -> None:
+            print(f"embedding {done}/{total} chunks", file=err)
+
     try:
-        report = embed_missing(
-            store,
-            _embedder(args),
-            on_batch=lambda done, total: print(f"embedding {done}/{total} chunks", file=err),
-        )
+        report = embed_missing(store, _embedder(args), on_batch=on_batch)
     except http.UnreachableError as exc:
         print(
             f"semantic search unavailable ({shown(str(exc))}); indexed for keyword search."
@@ -737,33 +751,89 @@ def free_port(first: int = FIRST_PORT, tries: int = 50) -> int | None:
     return None
 
 
-def _index_in_background(args: argparse.Namespace, err: TextIO) -> Callable[["Progress"], None]:
+def _index_in_background(
+    args: argparse.Namespace, err: TextIO, interval: float | None = POLL_SECONDS
+) -> Callable[["Progress"], None]:
+    """The web app's indexer thread: bring the index up to date, then keep it there by
+    watching the folder (ADR-0009). With ``interval`` None it stops after the first run."""
+
     def run(progress: "Progress") -> None:
-        done = 0
-
-        def on_file(rel: str) -> None:
-            nonlocal done
-            progress.update(current=rel, done=done)
-            done += 1
-
+        index_path = _index_path(args)
         try:
             # Its own connection: SQLite connections stay in the thread that made them.
-            with Store(_index_path(args)) as store:
-                report = index_folder(
-                    args.path, store, PypdfExtractor(), ChunkParams(), on_file=on_file
-                )
-                if args.retriever != "bm25":
-                    progress.update(current="", message="embedding for search by meaning")
-                    _embed(args, store, err)  # says so and carries on if Ollama is down
-        except (WrongFolderError, OSError, sqlite3.Error) as exc:
-            print(f"askpdf: indexing failed: {shown(str(exc))}", file=err)
-            progress.update(state="failed", current="", message=str(exc))
+            store = Store(index_path)
+        except (NotAnIndexError, OSError, sqlite3.Error) as exc:
+            _failed(progress, err, exc)
             return
-        for rel, reason in sorted(report.failed.items()):
-            print(f"failed: {shown(rel)}: {shown(reason)}", file=err)
-        progress.update(state="ready", current="", done=len(report.added))
+        with store:
+            try:
+                with store.writing():
+                    exclude = own_files(index_path)
+                    first = listing(args.path, exclude)  # before indexing: see changes meanwhile
+                    if not _update(args, store, progress, err, frozenset(), startup=True):
+                        return
+                    if interval is not None:
+                        watch(
+                            args.path,
+                            exclude,
+                            lambda skip: _update(args, store, progress, err, skip),
+                            threading.Event(),  # never set: the thread ends with the server
+                            first,
+                            interval,
+                        )
+            except IndexBusyError:
+                progress.update(
+                    state="ready",
+                    current="",
+                    message="another askpdf is keeping this index up to date",
+                )
 
     return run
+
+
+def _failed(progress: "Progress", err: TextIO, exc: Exception) -> None:
+    print(f"askpdf: indexing failed: {shown(str(exc))}", file=err)
+    progress.update(state="failed", current="", message=str(exc))
+
+
+def _update(
+    args: argparse.Namespace,
+    store: Store,
+    progress: "Progress",
+    err: TextIO,
+    skip: frozenset[str],
+    *,
+    startup: bool = False,
+) -> bool:
+    """One indexing run for the web app; False if it failed. Waits while an answer is
+    being written, before each file and each batch of embeddings: both want the CPU."""
+    read = 0
+
+    def on_file(rel: str) -> None:
+        nonlocal read
+        progress.pause_for_answers()
+        progress.update(state="indexing", current=rel, done=read, message="")
+        read += 1
+
+    def on_batch(done: int, total: int) -> None:
+        progress.update(state="indexing", current="", message=f"embedding {done}/{total}")
+        progress.pause_for_answers()
+
+    try:
+        report = index_folder(
+            args.path, store, PypdfExtractor(), ChunkParams(), on_file=on_file, skip=skip
+        )
+        if args.retriever != "bm25" and (startup or report.added or report.rebuilt):
+            progress.update(state="indexing", current="", message="embedding")
+            _embed(args, store, err, on_batch)  # says so and carries on if Ollama is down
+    except (WrongFolderError, OSError, sqlite3.Error) as exc:
+        _failed(progress, err, exc)
+        return False
+    for rel, reason in sorted(report.failed.items()):
+        print(f"failed: {shown(rel)}: {shown(reason)}", file=err)
+    if startup or report.changed or read:
+        progress.update(state="ready", current="", done=read, message="")
+    return True
 
 
 def _retriever(args: argparse.Namespace) -> Callable[[Snapshot, str, int], Search]:

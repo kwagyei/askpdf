@@ -107,7 +107,8 @@ def _events(text: str) -> list[tuple[str, dict[str, Any]]]:
     events = []
     for block in text.strip().split("\n\n"):
         lines = dict(line.split(": ", 1) for line in block.split("\n"))
-        events.append((lines["event"], json.loads(lines["data"])))
+        if "event" in lines:  # not the stream's "retry:" line
+            events.append((lines["event"], json.loads(lines["data"])))
     return events
 
 
@@ -525,6 +526,38 @@ def test_indexing_progress_streams_until_ready(folder: Path) -> None:
     assert events[-1][1]["state"] == "ready" and events[-1][1]["done"] == 1
 
 
+def test_the_event_stream_asks_the_browser_to_reconnect(client: TestClient) -> None:
+    # The stream ends while indexing is idle; the browser reopens it, so the watcher's
+    # later changes still reach the page.
+    assert client.get("/api/events").text.startswith("retry: 2000\n\n")
+
+
+def test_the_indexer_waits_while_an_answer_is_written(folder: Path) -> None:
+    shared: list[Progress] = []
+    idle_while_answering: list[bool] = []
+
+    def index(progress: Progress) -> None:
+        shared.append(progress)
+        progress.update(state="ready")
+
+    def chat_for(q: str, hits: Sequence[PageHit], texts: Mapping[Any, str]) -> ChatModel:
+        idle_while_answering.append(shared[0].idle.is_set())
+        return ScriptedChat(REPLY)
+
+    app = create_app(
+        root=folder,
+        index=folder.parent / "i.db",
+        port=PORT,
+        token=TOKEN,
+        chat_for=chat_for,
+        index_folder=index,
+    )
+    with _client(app) as client:
+        assert _events(_ask(client, "passwords").text)[-1][0] == "final"
+    assert idle_while_answering == [False]
+    assert shared[0].idle.is_set()  # free again once the answer is written
+
+
 def test_without_an_indexer_the_index_is_ready(client: TestClient) -> None:
     (event,) = _events(client.get("/api/events").text)
     assert event[1]["state"] == "ready"
@@ -545,7 +578,7 @@ def test_serve_indexes_the_folder_in_the_background(tmp_path: Path) -> None:
             port=PORT,
             token=TOKEN,
             chat_for=lambda q, h, t: ScriptedChat(REPLY),
-            index_folder=cli._index_in_background(args, errors),
+            index_folder=cli._index_in_background(args, errors, None),
         )
         with _client(app) as client:
             events = _events(client.get("/api/events").text)
@@ -565,7 +598,7 @@ def test_indexing_failure_is_reported(tmp_path: Path) -> None:
     args = build_parser().parse_args(["serve", str(tmp_path / "g"), "--index", str(index)])
     progress = Progress()
     with open(os.devnull, "w") as errors:
-        cli._index_in_background(args, errors)(progress)
+        cli._index_in_background(args, errors, None)(progress)
     assert progress.state == "failed" and "index of" in progress.message
 
 
@@ -723,7 +756,7 @@ def test_serve_with_hybrid_embeds_the_folder_and_searches_by_meaning(
         )
         with open(os.devnull, "w") as errors:
             progress = Progress()
-            cli._index_in_background(args, errors)(progress)
+            cli._index_in_background(args, errors, None)(progress)
         assert progress.state == "ready"
         with Store(index) as store:
             snapshot = Snapshot.load(store)
