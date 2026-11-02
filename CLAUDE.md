@@ -32,6 +32,11 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
   The serve thread (`cli._index_in_background`) holds `Store.writing()` (an OS file lock) for
   its lifetime and waits on `Progress.idle` while an answer streams. `/api/events` closes when
   idle and the browser reconnects (`retry: 2000`). Tests: `tests/test_watch.py`.
+- Release (design §19.11): `askpdf bench` writes `eval/results/bench-vX.Y.Z.json`; the test split
+  is scored once into `test-vX.Y.Z.json` and answers labelled by hand into
+  `test-vX.Y.Z-labels.json` (rules in `eval/LABELS.md`). `.github/workflows/release.yml` runs
+  `askpdf eval … --split test --release TAG --check` on a version tag and only then creates the
+  GitHub release (no PyPI). README tables come from `eval/tools/readme_tables.py`.
 - Dense/hybrid evaluation needs Ollama, so it runs locally (`eval/tools/tune_retrieval.py`)
   and stays out of the CI gate; results record the model digest and Ollama version.
 
