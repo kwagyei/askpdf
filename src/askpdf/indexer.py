@@ -5,14 +5,16 @@ size and modification time match the index are skipped without being read.
 Documents are keyed by content, so a renamed or copied file is recorded without
 extracting it again. One unreadable file is recorded as failed and the rest carry on.
 
-PR 10 runs this from a background thread driven by the folder watcher; here it is a
-plain function.
+The web app runs this from a background thread driven by the folder watcher
+(``askpdf.watch``); ``askpdf index`` runs it once.
 """
 
+import errno
 import hashlib
 import io
 import os
 import stat
+import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -112,6 +114,42 @@ def scan(
             yield path.relative_to(root).as_posix(), real
 
 
+# A file iCloud has evicted is downloaded when it is first read, which can take minutes,
+# or never finish offline. Not verified on current macOS (ADR-0009).
+READ_TIMEOUT = 30.0
+
+
+def read_bytes(path: Path, timeout: float = READ_TIMEOUT) -> bytes:
+    """``path.read_bytes()``, giving up after ``timeout`` seconds.
+
+    The read goes on in a daemon thread that is abandoned on timeout: a blocked read
+    cannot be interrupted, but it no longer holds up the other files.
+    """
+    result: list[bytes | BaseException] = []
+
+    def read() -> None:
+        try:
+            result.append(path.read_bytes())
+        except BaseException as exc:  # handed to the caller's thread
+            result.append(exc)
+
+    reader = threading.Thread(target=read, name="askpdf-read", daemon=True)
+    reader.start()
+    reader.join(timeout)
+    if not result:
+        raise OSError(errno.ETIMEDOUT, f"not available locally (still unread after {timeout:g} s)")
+    if isinstance(result[0], BaseException):
+        raise result[0]
+    return result[0]
+
+
+def own_files(index: Path) -> frozenset[Path]:
+    """The index and SQLite's files beside it, which may sit inside the folder (--index)."""
+    return frozenset(
+        Path(f"{index.resolve()}{suffix}") for suffix in ("", "-wal", "-shm", "-journal", ".lock")
+    )
+
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -152,21 +190,28 @@ def index_folder(
     extractor: Extractor,
     params: ChunkParams,
     on_file: Callable[[str], None] | None = None,
+    skip: frozenset[str] = frozenset(),
+    read_timeout: float = READ_TIMEOUT,
 ) -> IndexReport:
+    """Index what changed under ``root``. Paths in ``skip`` are still being written (the
+    watcher saw them change): they are left as they are, neither read nor removed."""
+    if not root.exists():
+        # Deleted, renamed or unmounted while askpdf runs: out of reach, so the index is
+        # kept as it is. (Its key could not be computed alike anyway: on macOS the case
+        # of a path is only canonical while it exists.)
+        return IndexReport(unreadable=["."])
     store.claim_folder(folder_key(root))
     report = IndexReport(rebuilt=store.ensure_pins(pins(extractor, params)))
     known = store.files()
     seen: set[str] = set()
-    # The index may have been put inside the folder with --index; never index it.
-    own_files = frozenset(
-        Path(f"{store.path.resolve()}{suffix}") for suffix in ("", "-wal", "-shm", "-journal")
-    )
-    for rel, real in scan(root, report.unreadable, own_files):
+    for rel, real in scan(root, report.unreadable, own_files(store.path)):
         if not _storable(rel):
             shown = rel.encode("utf-8", "backslashreplace").decode("ascii", "backslashreplace")
             report.failed[shown] = "file name is not valid UTF-8; rename the file"
             continue
         seen.add(rel)
+        if rel in skip:
+            continue
         previous = known.get(rel)
         try:
             info = real.stat()
@@ -181,7 +226,7 @@ def index_folder(
                 on_file(rel)
             # Read once: the hash and the extracted text must describe the same bytes,
             # even if the file is rewritten while we work.
-            data = real.read_bytes()
+            data = read_bytes(real, read_timeout)
         except FileNotFoundError:
             continue  # deleted since it was listed; the next run settles it
         except OSError as exc:

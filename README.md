@@ -105,8 +105,8 @@ the browser:
 
 ### In the browser
 
-`askpdf FOLDER` (short for `askpdf serve FOLDER`) indexes the folder in the background and
-opens a page on `127.0.0.1`. The pages being read appear as soon as they are found, the
+`askpdf FOLDER` (short for `askpdf serve FOLDER`) indexes the folder in the background,
+then keeps watching it, and opens a page on `127.0.0.1`. The pages being read appear as soon as they are found, the
 answer streams in while the model writes, and the checked version then replaces it: each
 `[n]` links to its PDF, opened at the cited page, and each quote shows ✓ or why it failed.
 A follow-up question is searched together with the conversation's earlier questions (up
@@ -130,6 +130,39 @@ requests, so it guards against that:
   and PDF text is inserted as text, never as HTML.
 
 Each of these has a test (`tests/test_web.py`).
+
+#### Watching the folder
+
+PDFs added to, changed in or deleted from the folder show up in the page without a
+restart. The folder is polled every 2 seconds rather than watched with OS events: polling
+needs no dependency and behaves the same on macOS, Linux, Windows, iCloud and network
+folders, at a cost that is small for hundreds of PDFs. A file is read only once its size
+and modification time are the same in two scans in a row, so a file still being copied or
+downloaded is never indexed half-written; it does not hold up the other files meanwhile.
+Files are keyed by content, so a renamed or copied PDF is recorded without being read
+again.
+
+Measured by hand on the Intel Mac this was built on (10 runs each, keyword search, PDFs of
+1.0 and 1.1 MB, with `askpdf serve` running), from the file landing in the folder to the
+index holding it:
+
+| Change | Median | Range |
+| --- | --- | --- |
+| Add a PDF | 5.5 s | 4.3–7.9 s |
+| Change a PDF | 5.9 s | 4.3–7.4 s |
+| Delete a PDF | 2.0 s | 2.0–2.0 s |
+
+An add or change is two scans plus the time to read the file, so a larger PDF takes
+longer. The deletes were each made just after a scan, so they show the slowest case; one
+made at a random moment is picked up within 0–2 s. With `--retriever hybrid` the new
+chunks are also embedded, which takes much longer (see the limitations).
+
+Indexing never competes with an answer: while one is being written the indexer waits
+before its next file or batch of embeddings. Only one askpdf process writes an index at a
+time (an OS file lock); a second `askpdf serve` on the same folder shows the index as it
+is and says so, and `askpdf index` refuses with a clear message.
+
+#### Opening a citation at its page
 
 Whether the browser's own PDF viewer honours `#page=N` is checked by hand:
 
@@ -262,9 +295,21 @@ listed in `eval/corpus/SOURCES.md`.
   without knowing what "it" is.
 - No summaries of whole documents or chapters: answers come from 3 pages, and askpdf
   does not read a PDF's table of contents. Such requests are declined plainly.
-- The web app answers one question at a time and indexes the folder once when it starts;
-  files added later are found after a restart (watching the folder is the next pull
-  request). It searches by keyword unless started with `--retriever`.
+- The web app answers one question at a time. It searches by keyword unless started with
+  `--retriever`.
+- Files that iCloud has moved off the Mac ("Optimise Mac Storage") are downloaded when
+  they are first read. askpdf gives up on a read after 30 seconds, marks the file "not
+  available locally" and tries again the next time something in the folder changes. How
+  current macOS behaves here has not been checked; the timeout is tested with a read that
+  is made to hang. A read that hangs leaves one idle thread behind until it ends, and a
+  file that stays unreadable costs those 30 seconds again on each later change.
+- A change is noticed by size and modification time. A file rewritten with exactly the
+  same size and modification time (a tool that restores the old timestamp) is not read
+  again until something else about it changes.
+- Indexing that takes under about 2 seconds may not show in the status line: the page
+  hears about indexing every 2 seconds, and then shows the new document list.
+- Polling scans the whole folder every 2 seconds, which is meant for hundreds of PDFs, not
+  tens of thousands.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
   2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about

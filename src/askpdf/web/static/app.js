@@ -84,26 +84,42 @@ async function loadDocs() {
   return n;
 }
 
+// The server ends this stream whenever indexing is idle and the browser reopens it a
+// couple of seconds later, so a PDF added to the folder shows up without a reload.
 function watchIndexing() {
   const source = new EventSource("/api/events");
+  let seen = -1;
+  let failures = 0;
+  source.onopen = () => {
+    failures = 0;
+  };
   source.addEventListener("progress", async (event) => {
     const p = JSON.parse(event.data);
+    if (p.version === seen) return; // the same news, heard again after reconnecting
+    seen = p.version;
     if (p.state === "indexing") {
       $("status").textContent = p.current
-        ? `Indexing ${p.current}… (${p.done} read)`
-        : "Checking the folder…";
+        ? `Indexing ${p.current}…`
+        : p.message
+          ? `Indexing: ${p.message}…`
+          : "Checking the folder…";
       return;
     }
-    source.close();
     const n = await loadDocs();
-    $("status").textContent =
-      p.state === "failed"
-        ? `Indexing failed: ${p.message}`
-        : `${n} ${n === 1 ? "document" : "documents"} ready`;
+    if (p.state === "failed") {
+      $("status").textContent = `Indexing failed: ${p.message}`;
+    } else {
+      const ready = `${n} ${n === 1 ? "document" : "documents"} ready`;
+      $("status").textContent = p.message ? `${ready} · ${p.message}` : ready;
+    }
   });
   source.onerror = () => {
-    source.close();
-    $("status").textContent = "Lost contact with askpdf; is it still running?";
+    // One error is the stream ending as planned; a second in a row, before it could
+    // reopen, means the server is gone.
+    failures += 1;
+    if (failures >= 2) {
+      $("status").textContent = "Lost contact with askpdf; is it still running?";
+    }
   };
 }
 

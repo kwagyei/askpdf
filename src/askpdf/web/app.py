@@ -161,6 +161,8 @@ async def _plain(send: Send, status: int, text: str) -> None:
     await send({"type": "http.response.body", "body": body})
 
 
+EVENTS_RETRY_MS = 2000
+
 # --- state ---------------------------------------------------------------------------------
 
 
@@ -174,6 +176,15 @@ class Progress:
     message: str = ""
     version: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    # Set while no answer is being written. The indexer waits on it between files and
+    # batches, so answering gets the CPU (ADR-0009).
+    idle: threading.Event = field(default_factory=threading.Event, repr=False)
+
+    def __post_init__(self) -> None:
+        self.idle.set()
+
+    def pause_for_answers(self) -> None:
+        self.idle.wait()
 
     def update(self, **changes: Any) -> None:
         with self._lock:
@@ -428,6 +439,10 @@ def create_app(
     @app.get("/api/events")
     async def events() -> StreamingResponse:
         async def stream() -> AsyncIterator[str]:
+            # The stream ends whenever indexing is not running, and the browser opens it
+            # again after EVENTS_RETRY_MS: the page hears about a change the watcher finds
+            # within that, and no connection is held open while nothing happens.
+            yield f"retry: {EVENTS_RETRY_MS}\n\n"
             seen = -1
             while True:
                 view = progress.view()
@@ -435,7 +450,7 @@ def create_app(
                     seen = view["version"]
                     yield sse("progress", view)
                 if view["state"] != "indexing":
-                    return  # the page closes its EventSource; PR 10 keeps it open
+                    return
                 await asyncio.sleep(0.25)
 
         return StreamingResponse(stream(), media_type="text/event-stream")
@@ -457,6 +472,7 @@ def create_app(
         if not answering.acquire(blocking=False):
             yield sse("error", {"message": "another question is being answered; try again"})
             return
+        progress.idle.clear()  # the indexer waits until this answer is written
         try:
             snapshot, ids = library.snapshot()
             # Follow-ups are searched with the conversation's questions joined: the
@@ -516,6 +532,7 @@ def create_app(
             log.exception("answering failed")
             yield sse("error", {"message": "askpdf failed while answering; see the terminal"})
         finally:
+            progress.idle.set()
             answering.release()
 
     @app.get("/pdf/{file_id}")

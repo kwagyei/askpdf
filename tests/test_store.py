@@ -4,8 +4,10 @@ from pathlib import Path
 import pytest
 
 from askpdf.store import (
+    SCHEMA_VERSION,
     ChunkRecord,
     FileRow,
+    IndexBusyError,
     NotAnIndexError,
     PageRecord,
     Store,
@@ -220,7 +222,7 @@ def test_interrupted_creation_does_not_lock_askpdf_out(
     def crash(*_args: object) -> None:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr("askpdf.store.os.replace", crash)
+    monkeypatch.setattr("askpdf.store.os.link", crash)
     with pytest.raises(KeyboardInterrupt):
         Store(path)
     monkeypatch.undo()
@@ -251,3 +253,39 @@ def test_folder_key_folds_case_only_where_the_filesystem_does(tmp_path: Path) ->
     else:  # case-sensitive: two folders, two keys
         other.mkdir()
         assert folder_key(folder) != folder_key(other)
+
+
+def test_a_second_creator_never_replaces_an_index_already_in_use(tmp_path: Path) -> None:
+    # Two processes racing to create the index: the loser must use the winner's file,
+    # not swap in its own, or the winner would go on writing into an unlinked file.
+    path = tmp_path / "i.db"
+    with Store(path) as first:
+        first.claim_folder("folder")
+        Store._create(path)  # the loser of the race, arriving late
+        with Store(path) as second:
+            assert second._get_meta("folder") == "folder"
+    assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
+
+
+def test_an_old_schema_is_rebuilt_in_place(tmp_path: Path) -> None:
+    path = tmp_path / "i.db"
+    with Store(path) as store:
+        store.claim_folder("folder")
+        store._db.execute("PRAGMA user_version = 1")
+    inode = path.stat().st_ino
+    with Store(path) as store:
+        assert store._get_meta("folder") is None and store.generation == 0
+        assert store._db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    assert path.stat().st_ino == inode  # the same file: other processes still see it
+
+
+def test_only_one_writer_holds_an_index(tmp_path: Path) -> None:
+    with Store(tmp_path / "i.db") as first, Store(tmp_path / "i.db") as second:
+        with (
+            first.writing(),
+            pytest.raises(IndexBusyError, match="another askpdf"),
+            second.writing(),
+        ):
+            pass
+        with second.writing():  # released when the first is done
+            pass

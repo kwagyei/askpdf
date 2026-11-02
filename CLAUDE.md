@@ -27,6 +27,11 @@ Design and ADRs: ~/Vault/Projects/code-projects/architect/askpdf-design.md and a
   headers) and `web/static/` (one page, vanilla JS, no inline script or style: the CSP forbids it).
   PDFs are served by `files.rowid` only, re-resolved inside the root on every request.
   Tests in `tests/test_web.py` cover every case in design §12.
+- Folder watching (ADR-0009): `watch.py` polls every 2 s; `Watcher.tick` takes listings, no
+  clock, and returns the paths still changing, which `index_folder(skip=...)` leaves alone.
+  The serve thread (`cli._index_in_background`) holds `Store.writing()` (an OS file lock) for
+  its lifetime and waits on `Progress.idle` while an answer streams. `/api/events` closes when
+  idle and the browser reconnects (`retry: 2000`). Tests: `tests/test_watch.py`.
 - Dense/hybrid evaluation needs Ollama, so it runs locally (`eval/tools/tune_retrieval.py`)
   and stays out of the CI gate; results record the model digest and Ollama version.
 
