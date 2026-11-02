@@ -262,6 +262,8 @@ def cmd_index(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
             return _error(
                 err, "the index is busy: another askpdf is indexing or serving this folder"
             )
+        except OSError as exc:  # the lock file cannot be made or locked
+            return _error(err, exc)
         except WrongFolderError as exc:
             return _error(err, f"{exc}; pass a different --index")
         except sqlite3.OperationalError as exc:
@@ -770,23 +772,25 @@ def _index_in_background(
                 with store.writing():
                     exclude = own_files(index_path)
                     first = listing(args.path, exclude)  # before indexing: see changes meanwhile
-                    if not _update(args, store, progress, err, frozenset(), startup=True):
-                        return
-                    if interval is not None:
-                        watch(
-                            args.path,
-                            exclude,
-                            lambda skip: _update(args, store, progress, err, skip),
-                            threading.Event(),  # never set: the thread ends with the server
-                            first,
-                            interval,
-                        )
+                    error = _update(args, store, progress, err, frozenset(), startup=True)
+                    if isinstance(error, WrongFolderError) or interval is None:
+                        return  # another folder's index: watching would fail the same way
+                    watch(
+                        args.path,
+                        exclude,
+                        lambda skip: _update(args, store, progress, err, skip) is None,
+                        threading.Event(),  # never set: the thread ends with the server
+                        {} if error else first,  # after a failed start, every file is news
+                        interval,
+                    )
             except IndexBusyError:
                 progress.update(
                     state="ready",
                     current="",
                     message="another askpdf is keeping this index up to date",
                 )
+            except OSError as exc:  # the lock file cannot be made or locked
+                _failed(progress, err, exc)
 
     return run
 
@@ -804,8 +808,8 @@ def _update(
     skip: frozenset[str],
     *,
     startup: bool = False,
-) -> bool:
-    """One indexing run for the web app; False if it failed. Waits while an answer is
+) -> Exception | None:
+    """One indexing run for the web app; the error if it failed. Waits while an answer is
     being written, before each file and each batch of embeddings: both want the CPU."""
     read = 0
 
@@ -826,14 +830,14 @@ def _update(
         if args.retriever != "bm25" and (startup or report.added or report.rebuilt):
             progress.update(state="indexing", current="", message="embedding")
             _embed(args, store, err, on_batch)  # says so and carries on if Ollama is down
-    except (WrongFolderError, OSError, sqlite3.Error) as exc:
+    except Exception as exc:
         _failed(progress, err, exc)
-        return False
+        return exc
     for rel, reason in sorted(report.failed.items()):
         print(f"failed: {shown(rel)}: {shown(reason)}", file=err)
-    if startup or report.changed or read:
+    if startup or report.changed or read or progress.state != "ready":
         progress.update(state="ready", current="", done=read, message="")
-    return True
+    return None
 
 
 def _retriever(args: argparse.Namespace) -> Callable[[Snapshot, str, int], Search]:

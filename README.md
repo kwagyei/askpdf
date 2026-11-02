@@ -301,8 +301,11 @@ listed in `eval/corpus/SOURCES.md`.
   they are first read. askpdf gives up on a read after 30 seconds, marks the file "not
   available locally" and tries again the next time something in the folder changes. How
   current macOS behaves here has not been checked; the timeout is tested with a read that
-  is made to hang. A read that hangs for good leaves one idle thread behind until askpdf
-  stops.
+  is made to hang. A read that hangs leaves one idle thread behind until it ends, and a
+  file that stays unreadable costs those 30 seconds again on each later change.
+- A change is noticed by size and modification time. A file rewritten with exactly the
+  same size and modification time (a tool that restores the old timestamp) is not read
+  again until something else about it changes.
 - Indexing that takes under about 2 seconds may not show in the status line: the page
   hears about indexing every 2 seconds, and then shows the new document list.
 - Polling scans the whole folder every 2 seconds, which is meant for hundreds of PDFs, not

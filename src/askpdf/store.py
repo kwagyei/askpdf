@@ -5,6 +5,7 @@ SHA-256 of their bytes, and pins the settings that produced it: if any of them c
 it is rebuilt rather than migrated.
 """
 
+import errno
 import hashlib
 import json
 import os
@@ -198,6 +199,10 @@ def _write_schema(db: sqlite3.Connection) -> None:
     db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
+# The errors a lock already held by another process gives (flock: EWOULDBLOCK;
+# msvcrt.locking: EACCES or EDEADLOCK). Anything else is a failure to lock at all.
+_HELD = frozenset({errno.EAGAIN, errno.EWOULDBLOCK, errno.EACCES, errno.EDEADLK})
+
 if sys.platform == "win32":
     import msvcrt
 
@@ -273,6 +278,10 @@ class Store:
             db.execute("PRAGMA journal_mode = WAL")
         finally:
             db.close()
+        if not path.exists():
+            # A WAL left beside a deleted index would be replayed into the new one.
+            for suffix in ("-wal", "-shm"):
+                Path(f"{path}{suffix}").unlink(missing_ok=True)
         try:
             os.link(tmp, path)
         except FileExistsError:
@@ -289,6 +298,12 @@ class Store:
         self._db.execute("PRAGMA foreign_keys = OFF")  # dropping in any order
         self._db.execute("BEGIN IMMEDIATE")
         try:
+            # Checked again under the write lock: another process that saw the same old
+            # version may have rebuilt it, and indexed into it, since this one looked.
+            if self._db.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION:
+                self._db.execute("COMMIT")
+                self._db.execute("PRAGMA foreign_keys = ON")
+                return
             tables = self._db.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
@@ -308,12 +323,18 @@ class Store:
         Raises IndexBusyError at once if another process holds it. The lock is an OS
         file lock, so it is released when the process ends, however it ends.
         """
-        lock = open(f"{self.path}.lock", "a+b")  # noqa: SIM115 - held until released
+        try:
+            lock = open(f"{self.path}.lock", "a+b")  # noqa: SIM115 - held until released
+        except OSError as exc:
+            raise OSError(exc.errno, f"cannot open the index's lock file: {exc}") from exc
         try:
             _try_lock(lock)
         except OSError as exc:
             lock.close()
-            raise IndexBusyError(f"another askpdf is writing the index at {self.path}") from exc
+            if exc.errno in _HELD:
+                raise IndexBusyError(f"another askpdf is writing the index at {self.path}") from exc
+            # Some network and cloud volumes support no locks at all (ENOLCK).
+            raise OSError(exc.errno, f"cannot lock the index: {exc}") from exc
         try:
             yield
         finally:

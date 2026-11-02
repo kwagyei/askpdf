@@ -195,6 +195,11 @@ def index_folder(
 ) -> IndexReport:
     """Index what changed under ``root``. Paths in ``skip`` are still being written (the
     watcher saw them change): they are left as they are, neither read nor removed."""
+    if not root.exists():
+        # Deleted, renamed or unmounted while askpdf runs: out of reach, so the index is
+        # kept as it is. (Its key could not be computed alike anyway: on macOS the case
+        # of a path is only canonical while it exists.)
+        return IndexReport(unreadable=["."])
     store.claim_folder(folder_key(root))
     report = IndexReport(rebuilt=store.ensure_pins(pins(extractor, params)))
     known = store.files()
