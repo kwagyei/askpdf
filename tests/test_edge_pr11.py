@@ -487,7 +487,7 @@ def test_check_on_the_committed_release_passes_for_the_two_model_free_stages(
 ) -> None:
     import pypdf
 
-    pin = re.search(r"^pypdf==(\S+)", (EVAL / "constraints.txt").read_text(), re.M)
+    pin = re.search(r"^pypdf==(\S+)", (EVAL / "constraints.txt").read_text(encoding="utf-8"), re.M)
     assert pin is not None
     if pypdf.__version__ != pin[1]:
         pytest.skip(f"results are pinned to pypdf {pin[1]}")
@@ -505,15 +505,15 @@ workflow = pytest.mark.skipif(not RELEASE_YML.is_file(), reason=".github is not 
 
 @workflow
 def test_release_workflow_actions_are_pinned_by_sha_like_ci() -> None:
-    uses = re.findall(r"uses:\s*(\S+)", RELEASE_YML.read_text())
+    uses = re.findall(r"uses:\s*(\S+)", RELEASE_YML.read_text(encoding="utf-8"))
     assert uses and all(re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", u) for u in uses)
-    ci = set(re.findall(r"uses:\s*(\S+)", CI_YML.read_text()))
+    ci = set(re.findall(r"uses:\s*(\S+)", CI_YML.read_text(encoding="utf-8")))
     assert set(uses) <= ci  # the same pins CI already runs with
 
 
 @workflow
 def test_release_workflow_has_least_privilege_and_orders_its_jobs() -> None:
-    text = RELEASE_YML.read_text()
+    text = RELEASE_YML.read_text(encoding="utf-8")
     assert re.search(r"^permissions:\n  contents: read\n", text, re.M)
     assert text.count("contents: write") == 1
     reproduce, release = text.split("  release:\n", 1)
@@ -526,13 +526,15 @@ def test_release_workflow_has_least_privilege_and_orders_its_jobs() -> None:
 @workflow
 def test_release_workflow_never_puts_the_tag_in_a_shell_line() -> None:
     """A tag name is attacker-chosen text; it must reach the shell as an env variable."""
-    for run in re.findall(r"run:\s*(?:\|\n((?:[ ]{10,}.*\n)+)|(.*)\n)", RELEASE_YML.read_text()):
+    for run in re.findall(
+        r"run:\s*(?:\|\n((?:[ ]{10,}.*\n)+)|(.*)\n)", RELEASE_YML.read_text(encoding="utf-8")
+    ):
         assert "${{" not in "".join(run)
 
 
 @workflow
 def test_release_workflow_runs_both_checks_on_the_test_split() -> None:
-    text = RELEASE_YML.read_text()
+    text = RELEASE_YML.read_text(encoding="utf-8")
     for stage in ("retrieval", "conversation"):
         assert re.search(rf'askpdf eval {stage} --split test --release "\$TAG" --check', text)
     assert 'test "$(askpdf --version)" = "askpdf ${TAG#v}"' in text
@@ -541,7 +543,7 @@ def test_release_workflow_runs_both_checks_on_the_test_split() -> None:
 
 @workflow
 def test_pull_requests_exercise_the_release_checks_before_a_tag_exists() -> None:
-    ci = CI_YML.read_text()
+    ci = CI_YML.read_text(encoding="utf-8")
     assert re.search(r"askpdf eval (retrieval|conversation) --split test .*--check", ci)
 
 
@@ -557,7 +559,9 @@ def _jsonl(path: Path) -> list[dict[str, Any]]:
 
 @results
 def test_label_counts_in_the_readme_follow_from_the_raw_labels() -> None:
-    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text())["labels"]
+    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text(encoding="utf-8"))[
+        "labels"
+    ]
     questions = {q["id"]: q for q in _jsonl(EVAL / "questions" / "test.jsonl")}
     assert set(labels) == set(questions)  # every test question labelled, none invented
     answerable = {k: v for k, v in labels.items() if questions[k]["answerable"]}
@@ -578,8 +582,12 @@ def test_label_counts_in_the_readme_follow_from_the_raw_labels() -> None:
 @results
 def test_causes_agree_with_what_the_retriever_returned() -> None:
     """`retrieval` iff no gold page was in the 3 pages the model read."""
-    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text())["stages"]
-    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text())["labels"]
+    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text(encoding="utf-8"))[
+        "stages"
+    ]
+    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text(encoding="utf-8"))[
+        "labels"
+    ]
     questions = {q["id"]: q for q in _jsonl(EVAL / "questions" / "test.jsonl")}
     for qid, label in labels.items():
         q = questions[qid]
@@ -592,8 +600,12 @@ def test_causes_agree_with_what_the_retriever_returned() -> None:
 
 @results
 def test_abstained_label_matches_a_not_found_reply() -> None:
-    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text())["stages"]
-    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text())["labels"]
+    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text(encoding="utf-8"))[
+        "stages"
+    ]
+    labels = json.loads((EVAL / "results" / "test-v0.1.0-labels.json").read_text(encoding="utf-8"))[
+        "labels"
+    ]
     replies = release["answers"]["per_question"]
     for qid, label in labels.items():
         if label["label"] == "abstained":
@@ -608,8 +620,8 @@ def test_the_split_is_hash_pinned_and_the_results_cover_it() -> None:
 
     for folder, name in (("questions", "test.jsonl"), ("conversations", "test.jsonl")):
         digest = hashlib.sha256((EVAL / folder / name).read_bytes()).hexdigest()
-        assert digest == (EVAL / folder / "test.sha256").read_text().strip()
-    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text())
+        assert digest == (EVAL / folder / "test.sha256").read_text(encoding="utf-8").strip()
+    release = json.loads((EVAL / "results" / "test-v0.1.0.json").read_text(encoding="utf-8"))
     assert release["release"] == "v0.1.0"
     questions = _jsonl(EVAL / "questions" / "test.jsonl")
     assert release["stages"]["answers"]["n_questions"] == len(questions) == 53
@@ -618,8 +630,12 @@ def test_the_split_is_hash_pinned_and_the_results_cover_it() -> None:
 
 @results
 def test_readme_latency_rows_equal_the_bench_file() -> None:
-    bench = json.loads((EVAL / "results" / "bench-v0.1.0.json").read_text())
-    block = re.search(r"<!-- results:latency -->\n(.*?)<!-- /results -->", README.read_text(), re.S)
+    bench = json.loads((EVAL / "results" / "bench-v0.1.0.json").read_text(encoding="utf-8"))
+    block = re.search(
+        r"<!-- results:latency -->\n(.*?)<!-- /results -->",
+        README.read_text(encoding="utf-8"),
+        re.S,
+    )
     assert block is not None
     text = block[1]
     for needle in (bench["machine"], bench["model"], bench["ollama_version"], bench["date"]):
@@ -634,7 +650,7 @@ def test_readme_latency_rows_equal_the_bench_file() -> None:
 
 @results
 def test_the_bench_file_is_internally_consistent() -> None:
-    bench = json.loads((EVAL / "results" / "bench-v0.1.0.json").read_text())
+    bench = json.loads((EVAL / "results" / "bench-v0.1.0.json").read_text(encoding="utf-8"))
     assert bench["indexing"]["seconds_per_document"]["n"] == (
         bench["indexing"]["documents"] * bench["indexing"]["runs"]
     )
@@ -646,7 +662,11 @@ def test_the_bench_file_is_internally_consistent() -> None:
 
 
 def _block(name: str) -> str:
-    match = re.search(rf"<!-- results:{name} -->\n(.*?)<!-- /results -->", README.read_text(), re.S)
+    match = re.search(
+        rf"<!-- results:{name} -->\n(.*?)<!-- /results -->",
+        README.read_text(encoding="utf-8"),
+        re.S,
+    )
     assert match is not None
     return match[1]
 

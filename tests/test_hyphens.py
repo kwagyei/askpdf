@@ -249,7 +249,9 @@ def test_a_footer_after_a_hyphenated_line_stays_on_its_own_line() -> None:
 def test_hyphen_resolution_is_linear(text: str) -> None:
     started = time.perf_counter()
     resolve_hyphens([text])
-    assert time.perf_counter() - started < 2  # minutes before the fix
+    # Under a second here, and minutes before the fix; the bound is loose because a CI
+    # runner shares its cores with the rest of the suite.
+    assert time.perf_counter() - started < 15
 
 
 def test_a_long_chain_keeps_every_hyphen_and_joins_every_line() -> None:
