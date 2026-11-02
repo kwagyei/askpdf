@@ -127,6 +127,11 @@ def _json(line: str) -> dict[str, Any]:
     return value
 
 
+def unload(url: str = DEFAULT_URL, model: str = CHAT_MODEL) -> None:
+    """Ask Ollama to drop the model from memory, so the next answer starts cold."""
+    http.post_json(f"{url}/api/generate", {"model": model, "keep_alive": 0})
+
+
 def server_info(url: str = DEFAULT_URL, model: str = EMBED_MODEL) -> dict[str, str]:
     """Ollama's version and the model's digest, recorded next to every model-based result."""
     version = http.get_json(f"{url}/api/version")

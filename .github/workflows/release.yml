@@ -1,0 +1,66 @@
+name: Release
+
+# On a version tag: the frozen test split is scored once per release, locally, and
+# committed as eval/results/test-vX.Y.Z.json (ADR-0007). This job scores the model-free
+# stages again from the tagged commit and fails unless they match exactly; only then is
+# the GitHub release created. There is no PyPI upload (ADR-0001).
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    name: Reproduce the test split
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install package and eval tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --group eval -c eval/constraints.txt
+          python -m pip install . -c eval/constraints.txt
+      - name: The tag is the package version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: test "$(askpdf --version)" = "askpdf ${TAG#v}"
+      - name: BM25 retrieval on test matches the committed release results
+        env:
+          TAG: ${{ github.ref_name }}
+        run: askpdf eval retrieval --split test --release "$TAG" --check
+      - name: Conversations on test match the committed release results
+        env:
+          TAG: ${{ github.ref_name }}
+        run: askpdf eval conversation --split test --release "$TAG" --check
+
+  release:
+    name: GitHub release
+    needs: reproduce
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Build the wheel and sdist
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m build
+      - name: Create the release with the built files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* --verify-tag --title "askpdf $TAG" \
+            --notes "Install: pipx install git+https://github.com/kwagyei/askpdf@$TAG — see the README for Ollama setup and the measured results."

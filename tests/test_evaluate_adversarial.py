@@ -357,3 +357,32 @@ def test_a_transcript_for_a_missing_page_is_an_error() -> None:
         evaluate_pages([Transcript("d", 9, "text", ())], {"d": [_page(1, "text")]})
     with pytest.raises(ValueError, match="no such page"):
         evaluate_pages([Transcript("other", 1, "text", ())], {"d": [_page(1, "text")]})
+
+
+@in_repo
+def test_check_reproduces_a_scored_release_and_catches_a_change(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    eval_dir = tmp_path / "eval"
+    synthetic_eval(eval_dir)
+    base = ["eval", "conversation", "--split", "test", "--release", "v9.9.9"]
+    base += ["--eval-dir", str(eval_dir)]
+    assert main([*base, "--check"]) == 1  # nothing scored yet
+    assert "nothing to check" in capsys.readouterr().err
+    assert main(base) == 0
+    release = eval_dir / "results" / "test-v9.9.9.json"
+    written = release.read_text(encoding="utf-8")
+    assert main([*base, "--check"]) == 0
+    assert "matches" in capsys.readouterr().err
+    assert release.read_text(encoding="utf-8") == written  # a check never writes
+    data = json.loads(written)
+    first = next(k for k, v in data["stages"]["conversation"].items() if isinstance(v, int))
+    data["stages"]["conversation"][first] += 1
+    release.write_text(json.dumps(data), encoding="utf-8")
+    assert main([*base, "--check"]) == 1
+    assert f"differs from {release}: {first}" in capsys.readouterr().err
+
+
+def test_check_is_only_for_the_test_split(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["eval", "conversation", "--check"]) == 1
+    assert "--check goes with --split test" in capsys.readouterr().err
