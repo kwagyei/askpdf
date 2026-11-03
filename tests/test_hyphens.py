@@ -1,6 +1,7 @@
 """Line-end hyphens are resolved by the document's own spelling (ADR-0002 Amendment 1)."""
 
 import re
+import time
 import unicodedata
 from pathlib import Path
 
@@ -231,3 +232,27 @@ def test_a_protected_line_keeps_its_line_end_hyphen() -> None:
 def test_a_footer_after_a_hyphenated_line_stays_on_its_own_line() -> None:
     pages = [f"Report title\nbody text-\n{n}" for n in range(1, 6)]
     assert clean_document(pages)[0] == "Report title\nbody text-\n1"
+
+
+# --- cost on hostile input (reviewer M2) ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a" * 200_000 + " x-\nb",  # a long word before a break: no backtracking
+        "ab-\n" * 50_000 + "b",  # a chain of broken lines: the line is not copied per join
+        "a" + "-" * 200_000 + "-\nb",  # a long run of hyphens
+    ],
+    ids=["long-word", "chain", "hyphen-run"],
+)
+def test_hyphen_resolution_is_linear(text: str) -> None:
+    started = time.perf_counter()
+    resolve_hyphens([text])
+    # Under a second here, and minutes before the fix; the bound is loose because a CI
+    # runner shares its cores with the rest of the suite.
+    assert time.perf_counter() - started < 15
+
+
+def test_a_long_chain_keeps_every_hyphen_and_joins_every_line() -> None:
+    assert resolve_hyphens(["ab-\n" * 3 + "b"]) == ["ab-ab-ab-b"]

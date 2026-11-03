@@ -3,7 +3,7 @@
 Results go to stdout and progress to stderr, so output can be piped. Exit codes:
 0 success, 1 a run-time problem (missing folder, unusable or busy index, no model), 2 bad
 options, 3 an answer none of whose quotes was found on its cited page, 130 interrupted.
-`askpdf FOLDER` is short for `askpdf serve FOLDER`. `bench` arrives in a later pull request.
+`askpdf FOLDER` is short for `askpdf serve FOLDER`.
 """
 
 import argparse
@@ -174,6 +174,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--json", type=Path, metavar="PATH", help="also write the results here")
     evaluate.add_argument(
+        "--check",
+        action="store_true",
+        help="with --split test: score again and compare with the release's committed results",
+    )
+    evaluate.add_argument(
         "--retriever",
         choices=list(RETRIEVERS),
         default="bm25",
@@ -183,7 +188,36 @@ def build_parser() -> argparse.ArgumentParser:
         "--rrf-k", type=_positive, default=RRF_K, metavar="N", help="RRF constant for hybrid"
     )
     evaluate.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
+    bench = commands.add_parser("bench", help="time indexing, search and answers on this machine")
+    bench.add_argument(
+        "--runs", type=_positive, default=3, metavar="N", help="repeats of indexing and search"
+    )
+    bench.add_argument(
+        "--answers",
+        type=_count,
+        default=10,
+        metavar="N",
+        help="questions answered with Ollama, the first cold (default: 10; 0 skips the model)",
+    )
+    bench.add_argument(
+        "--machine", default=None, help="a label for this machine, recorded with the results"
+    )
+    bench.add_argument(
+        "--eval-dir",
+        type=Path,
+        default=Path("eval"),
+        metavar="DIR",
+        help="the corpus and dev questions to time (default: ./eval)",
+    )
+    bench.add_argument("--json", type=Path, metavar="PATH", help="also write the results here")
+    bench.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _count(text: str) -> int:
+    if text == "0":
+        return 0
+    return _positive(text)
 
 
 def _port(text: str) -> int:
@@ -383,6 +417,12 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, "extraction has no question split; drop --split and --release")
     if args.split == "dev" and args.release:
         return _error(err, "--release goes with --split test only")
+    if args.check and args.split != "test":
+        return _error(err, "--check goes with --split test --release vX.Y.Z")
+    if args.check and args.stage not in ("retrieval", "conversation"):
+        # The answers stage needs the model and is never rerun: that would answer the
+        # frozen questions again, for numbers that differ between machines anyway.
+        return _error(err, "--check covers the model-free stages: retrieval and conversation")
     release_file, release = None, None
     if args.split == "test":
         if not RELEASE.fullmatch(args.release or ""):
@@ -397,7 +437,9 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
                     raise ValueError("not an askpdf release results file")
             except (OSError, ValueError) as exc:
                 return _error(err, f"cannot read {release_file}: {exc}")
-        if args.stage in release["stages"]:
+        if args.check and args.stage not in release["stages"]:
+            return _error(err, f"{args.stage} was not scored for {args.release}; nothing to check")
+        if args.stage in release["stages"] and not args.check:
             return _error(
                 err,
                 f"{args.stage} on the test split was already scored for {args.release}"
@@ -412,6 +454,17 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         summary = run.get(args.stage, _eval_extraction)(args, out)
     except ValueError as exc:
         return _error(err, exc)
+    if args.check and release is not None:
+        # The release workflow: a fresh run must reproduce the frozen numbers exactly.
+        committed = release["stages"][args.stage]
+        fresh = json.loads(json.dumps(summary))  # the types the file holds (lists, not tuples)
+        if fresh != committed:
+            changed = sorted(
+                k for k in fresh.keys() | committed.keys() if fresh.get(k) != committed.get(k)
+            )
+            return _error(err, f"{args.stage} differs from {release_file}: {', '.join(changed)}")
+        print(f"{args.stage} matches {release_file}", file=err)
+        return 0
     try:
         if args.json:
             _write_json(args.json, summary)
@@ -970,6 +1023,61 @@ class _Stdout(io.TextIOBase):
             raise _as_pipe_error(exc) from exc
 
 
+def cmd_bench(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    import datetime
+    import platform
+
+    from askpdf import bench
+    from askpdf.evaluate import questions, retrieval
+
+    corpus = args.eval_dir / "corpus"
+    pdfs = sorted(p for p in corpus.glob("*.pdf")) if corpus.is_dir() else []
+    path = args.eval_dir / "questions" / "dev.jsonl"
+    if not pdfs or not path.is_file():
+        return _error(err, f"no corpus or dev questions under {args.eval_dir}; run from the repo")
+    try:
+        asked = [q.question for q in questions.load(path)]
+    except (OSError, ValueError) as exc:
+        return _error(err, f"cannot read {path}: {exc}")
+    result: dict[str, Any] = {
+        "askpdf": __version__,
+        "date": datetime.date.today().isoformat(),
+        "machine": args.machine or platform.platform(),
+        "python": platform.python_version(),
+    }
+    print(f"indexing {len(pdfs)} documents, {args.runs} runs", file=err)
+    result["indexing"] = bench.time_indexing(pdfs, args.runs)
+    snapshot = retrieval.load_corpus_snapshot(corpus)
+    result["search_ms"] = bench.time_search(snapshot, asked, args.runs, ANSWER_K)
+    if args.answers:
+        url = ollama.base_url()
+        try:
+            http.require_local_or_allowed(url, allow_remote(args.allow_remote))
+            result.update(model=ollama.CHAT_MODEL, **ollama.server_info(url, ollama.CHAT_MODEL))
+
+            def chat_for(question: str, hits: Sequence[PageHit]) -> ChatModel:
+                prompt = build_prompt(question, hits, snapshot.texts)
+                return ollama.OllamaChat(url, num_ctx=context_window(prompt, 768))
+
+            result["answers_seconds"] = bench.time_answers(
+                snapshot,
+                asked[: args.answers],
+                ANSWER_K,
+                chat_for,
+                lambda: ollama.unload(url),
+                lambda n, total: print(f"answered {n}/{total}", file=err, flush=True),
+            )
+        except http.ProviderError as exc:
+            return _error(err, f"{exc}; answers need Ollama running (or pass --answers 0)")
+    print(json.dumps(result, indent=2, ensure_ascii=False), file=out)
+    if args.json:
+        try:
+            _write_json(args.json, result)
+        except OSError as exc:
+            return _error(err, f"cannot write {args.json}: {exc.strerror or exc}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     commands = {
@@ -979,6 +1087,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "ask": cmd_ask,
         "eval": cmd_eval,
         "serve": cmd_serve,
+        "bench": cmd_bench,
     }
     if argv and argv[0] not in commands and not argv[0].startswith("-"):
         argv.insert(0, "serve")  # `askpdf FOLDER` opens the web app

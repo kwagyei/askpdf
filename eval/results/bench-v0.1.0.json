@@ -1,0 +1,48 @@
+{
+  "askpdf": "0.1.0",
+  "date": "2026-11-02",
+  "machine": "MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU",
+  "python": "3.13.3",
+  "indexing": {
+    "documents": 4,
+    "runs": 3,
+    "seconds_per_document": {
+      "n": 12,
+      "p50": 0.705,
+      "p95": 6.25
+    },
+    "pages_per_second": 20.5
+  },
+  "search_ms": {
+    "n": 174,
+    "p50": 0.21,
+    "p95": 0.4
+  },
+  "model": "llama3.2:3b",
+  "ollama_version": "0.40.5",
+  "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+  "answers_seconds": {
+    "cold": {
+      "pages": 0.0,
+      "first_token": 88.8,
+      "total": 98.2
+    },
+    "warm": {
+      "pages": {
+        "n": 9,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "first_token": {
+        "n": 9,
+        "p50": 56.0,
+        "p95": 120.3
+      },
+      "total": {
+        "n": 9,
+        "p50": 66.4,
+        "p95": 185.2
+      }
+    }
+  }
+}

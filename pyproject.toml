@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "askpdf"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Ask questions about a folder of PDFs; answers cite the page, verified word for word."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -7,11 +7,25 @@ cites the page it came from, and each quoted passage is checked word for word ag
 page. It runs locally with [Ollama](https://ollama.com); nothing leaves your machine unless
 you opt in to a remote model.
 
-> **Work in progress.** The design is settled and the code arrives through pull requests.
-> What works today: reading a folder of PDFs into a local index, searching it by keyword
-> (BM25) or by meaning (embeddings from a local model), and answering questions with
-> checked citations, in the browser or from the command line. Watching the folder for
-> changes comes next.
+![askpdf answering a question about a NIST standard, with a checked quote under each citation](docs/screenshots/answer.png)
+
+## Install and run
+
+askpdf needs Python 3.12 or newer and [Ollama](https://ollama.com) for answers. It is
+installed from GitHub, not PyPI:
+
+```sh
+pipx install git+https://github.com/kwagyei/askpdf@v0.1.0
+ollama pull llama3.2:3b          # answers (2 GB)
+ollama pull nomic-embed-text     # optional: search by meaning (270 MB)
+askpdf ~/Documents/papers        # indexes the folder, watches it, opens the browser
+```
+
+Without Ollama, indexing and keyword search still work, and askpdf says why answers are
+not available. On a laptop without a GPU an answer takes one to three minutes (measured
+below).
+
+### From the command line
 
 ```sh
 $ askpdf index ~/Documents/papers
@@ -164,13 +178,14 @@ is and says so, and `askpdf index` refuses with a clear message.
 
 #### Opening a citation at its page
 
-Whether the browser's own PDF viewer honours `#page=N` is checked by hand:
+Whether the browser's own PDF viewer honours `#page=N` is checked by hand, on macOS 15,
+by clicking a source in a running app (2026-11-03):
 
 | Browser | Opens at the cited page? |
 | --- | --- |
-| Chrome | not checked yet |
-| Safari | not checked yet |
-| Firefox | not checked yet |
+| Chrome | yes |
+| Safari | yes |
+| Firefox | not checked |
 
 ## What makes it different
 
@@ -181,16 +196,17 @@ so a bad answer can be traced to where it went wrong:
 | --- | --- | --- |
 | Text extraction | Did we read the page correctly? (character error rate on hand-transcribed pages) | measured |
 | Retrieval | Did we find the right page? (hit@k, recall@k, MRR, nDCG) | BM25, dense and hybrid measured |
-| Grounding | Does the cited page actually contain the quote? | measured on dev (local model) |
-| Abstention | Does it say "not found" instead of guessing? | measured on dev (local model) |
-| Follow-ups | Are follow-up questions rewritten correctly? | baselines measured |
-| Latency | How long does it take on an 8 GB laptop without a GPU? | planned |
+| Grounding | Does the cited page actually contain the quote? | measured (local model) |
+| Abstention | Does it say "not found" instead of guessing? | measured (local model) |
+| Follow-ups | Does a follow-up question still find the right page? | measured |
+| Latency | How long does it take on an 8 GB laptop without a GPU? | measured |
 
 Tuning happens on a development split; the test split is frozen (hash-pinned) and scored
 once per release. Questions from the Qasper dataset, written by people who had seen only
 a paper's title and abstract, were planned as an outside check but were cut to ship
-sooner; the limitations below say what that leaves. A CI job reruns every model-free number below, checks these tables against the results
-files, and fails if a number changes without them.
+sooner; the limitations below say what that leaves. A CI job reruns every model-free number below (extraction, retrieval and follow-ups, on dev
+and on the frozen test split), checks these tables against the results files, and fails if
+a number changes without them. Numbers that need the model are run by hand and committed.
 
 ### First results (development split, model-free)
 
@@ -246,7 +262,7 @@ These need Ollama, so they are run by hand on the development Mac (Intel, no GPU
 committed, not rerun in CI. Every reply is kept in `eval/results/dev-answers.json`.
 
 <!-- results:answers -->
-Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each:
+Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages each; MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU, 2026-10-31:
 
 | Measure | Result |
 | --- | --- |
@@ -267,6 +283,85 @@ a format than about whether its answers are true; a larger model, or a remote on
 `--api-url`, is the obvious thing to try. Unanswerable questions are where it helps most:
 it said "not found" for 6 of 9 and never for an answerable one.
 
+### Release v0.1.0: the frozen test split
+
+Everything above was tuned on the development split. The test split was hash-pinned
+when the questions were written and scored once, for this release, after all tuning was
+done; `eval/results/test-v0.1.0.json` holds every per-question result. The release
+workflow rescores its model-free stages from the tagged commit and refuses to publish
+the release unless they match exactly.
+
+<!-- results:test-split -->
+BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets. Answers from llama3.2:3b (Ollama 0.40.5) on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; test split scored 2026-11-02.
+
+| Measure | dev (tuned on) | test, v0.1.0 (scored once) |
+| --- | --- | --- |
+| Retrieval hit@1, all answerable | 0.592 (0.45 to 0.73) | 0.674 (0.54 to 0.80) |
+| Retrieval nDCG@10 | 0.768 | 0.794 |
+| hit@1, lexical / paraphrased questions | 0.923 / 0.423 | 0.818 / 0.615 |
+| Follow-ups, hit@1 with history joined | 0.500 (n = 14) | 0.600 (n = 10) |
+| Answers with a verified citation | 0.224 (0.12 to 0.35) | 0.395 (0.26 to 0.53) |
+| Unanswerable questions answered anyway | 3 of 9 | 3 of 7 |
+| Median time per answer | 63 s | 71 s |
+<!-- /results -->
+
+The test split came out a little better than dev, within the intervals; with under 50
+questions on each, neither is a precise number, and the gap is not a sign of anything.
+The share of answers with a verified citation is the measure that moved most, and it
+depends heavily on whether the 3B model follows the quote format on a given question.
+
+#### Are the answers right?
+
+The automatic checks above show whether quoted words are on the cited page, not whether
+the answer is right, so the test answers were also labelled by hand. One labeller did
+this: Claude, the AI model that is this project's lead developer and wrote the questions.
+There was no second labeller, so these are one careful reader's judgements, each with its
+reason in `eval/results/test-v0.1.0-labels.json`, and the rules were written down before
+any answer was read.
+
+<!-- results:correctness -->
+Each of the 53 test answers labelled by hand against its evidence, by the rules in `eval/LABELS.md`:
+
+| Answer | Questions |
+| --- | --- |
+| Correct | 38 of 46 (0.826, 95% interval 0.72 to 0.93) |
+| Partly correct | 1 of 46 |
+| Wrong | 4 of 46 |
+| Said not found, though the answer is in the documents | 3 of 46 |
+| Unanswerable, correctly declined | 5 of 7 |
+
+Of the 8 answerable questions not answered correctly, 5 never had the page with the answer among the 3 pages the model read, and 3 had it and misread it.
+<!-- /results -->
+
+Two of the 38 correct answers came from the model's own knowledge: none of the 3 pages it
+read held the evidence (`nist-06`, `nist-22`). They count as correct because the labels
+judge the answer, but askpdf could not have shown where they came from.
+
+One difference from the automatic count above: it scores 3 unanswerable questions as
+answered, but one of those replies says in words that the pages do not say, which counts
+as declining here.
+
+So the small model is right far more often than its verified citations suggest: most
+misses are formatting (a quote filed under the wrong number, or no quote at all), not
+wrong facts. When it is wrong, the cause is more often search than reading: the page
+with the answer was not among the 3 it was given.
+
+### Latency
+
+<!-- results:latency -->
+`askpdf bench` on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; llama3.2:3b on Ollama 0.40.5, 2026-11-02:
+
+| Step | n | p50 | p95 (the slowest, when n < 20) |
+| --- | --- | --- | --- |
+| Index one document (extract, clean, chunk, store) | 12 | 0.70 s | 6.25 s |
+| Keyword search over the corpus | 174 | 0.21 ms | 0.40 ms |
+| Answer, warm: first token | 9 | 56 s | 120 s |
+| Answer, warm: checked answer shown | 9 | 66 s | 185 s |
+| Answer, cold (model loaded first): first token / shown | 1 | 89 s / 98 s | |
+
+Indexing ran at 20.5 pages a second over 4 documents (3 runs); embedding for search by meaning is extra. The pages to be read are shown in under 0.05 s; nearly all of the wait is the model reading them. Ollama is given a context window sized to each prompt, and may reload the model when that size changes, so some warm times may include a reload.
+<!-- /results -->
+
 **Who wrote the evaluation data.** The questions, conversations and page transcriptions
 were drafted by an AI model (Claude) working as the project's lead developer, and are
 being checked by hand by the author. The questions were written from askpdf's extracted
@@ -279,15 +374,15 @@ scanned report, evidence quotes follow its OCR layer, misreadings included, beca
 checked against the text askpdf actually extracts. The corpus files and their licences are
 listed in `eval/corpus/SOURCES.md`.
 
-## Known limitations (so far)
+## Known limitations
 
 - Answers are slow on a laptop without a GPU. On the Intel Mac this was built on, the 3B
   model reads the 3 pages for most of a minute before it writes; the median answer on the
   development questions took 63 seconds. Fewer pages are sent for that reason, so a few answers miss
   their page (see `eval/TUNING.md`).
-- Whether an answer is *correct* is not measured yet; the checks above show that quoted
-  words are on the cited page, not that the answer is right. People label a sample of
-  answers at release.
+- Answer correctness was labelled by one labeller, the AI model that built the project,
+  on 53 test questions: 38 of 46 answerable ones correct. A second, human labeller and an
+  agreement score were cut to ship sooner, so treat that number as a careful estimate.
 - The answer model sees only the question and the retrieved pages, not earlier turns. A
   follow-up is searched with the earlier questions joined, which helps retrieval (hit@1
   0.500 against 0.429 as typed on 14 development follow-ups, though the intervals
