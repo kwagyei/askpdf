@@ -178,13 +178,14 @@ is and says so, and `askpdf index` refuses with a clear message.
 
 #### Opening a citation at its page
 
-Whether the browser's own PDF viewer honours `#page=N` is checked by hand:
+Whether the browser's own PDF viewer honours `#page=N` is checked by hand, on macOS 15,
+by clicking a source in a running app (2026-11-03):
 
 | Browser | Opens at the cited page? |
 | --- | --- |
-| Chrome | not checked yet |
-| Safari | not checked yet |
-| Firefox | not checked yet |
+| Chrome | yes |
+| Safari | yes |
+| Firefox | not checked |
 
 ## What makes it different
 
