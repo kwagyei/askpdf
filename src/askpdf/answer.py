@@ -156,8 +156,9 @@ def answer(
 _HEADING = re.compile(r"^[ \t*#_>]*quotes?[ \t*_]*(?::[ \t*_]*|$)", re.I | re.M)
 _MARKER = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 # No backtracking between whitespace and text: the rest of the line is taken whole and
-# stripped, so a long run of spaces costs linear time.
-_QUOTE_LINE = re.compile(r"^[\W_]*?\[(\d+)\]\s*[:\-\u2013\u2014]?(.*)", re.M)
+# stripped, so a long run of spaces costs linear time. The prefix stays on its line: if it
+# could cross newlines, each line start would scan on through every line after it.
+_QUOTE_LINE = re.compile(r"^(?:[^\w\n]|_)*?\[(\d+)\]\s*[:\-\u2013\u2014]?(.*)", re.M)
 _INLINE_QUOTE = re.compile(r"[^\S\n]*\[\d+\]")  # "Quotes: [1] ..." on one line
 # A context has a handful of pages; a longer number is never valid, and converting
 # thousands of digits with int() raises ValueError.
