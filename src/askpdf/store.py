@@ -218,34 +218,38 @@ else:
         fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
-CREATE_WAIT = 5.0  # seconds a creator waits for the lock before leaving sidecars alone
+CREATE_WAIT = 5.0  # a creator holds its lock for milliseconds; this bounds a hung one
 
 
 @contextmanager
 def _creating(path: Path) -> Iterator[bool]:
-    """Hold the index's lock file while creating it; True if no one else can be creating
-    or writing it. A server holding the lock on a deleted index keeps it for good, so
-    after CREATE_WAIT this gives up and yields False: its -wal and -shm are live."""
+    """Hold ``{path}.creating`` while creating the index; True if no other creator can be
+    between its check and its link, so a deleted index's -wal and -shm are safe to clear.
+    It is not the writer lock: a server taking that while another process creates the
+    index must not be told the index is busy."""
     try:
-        lock = open(f"{path}.lock", "a+b")  # noqa: SIM115 - closed below
+        lock = open(f"{path}.creating", "a+b")  # noqa: SIM115 - closed below
     except OSError:
+        lock = None
+    if lock is None:
         yield True  # no lock file possible: as before, nothing to coordinate with
         return
     with lock:
-        deadline = time.monotonic() + CREATE_WAIT
-        while True:
-            try:
-                _try_lock(lock)
-            except OSError as exc:
-                if exc.errno not in _HELD:
-                    break  # a volume without locks: as before
-                if time.monotonic() > deadline:
-                    yield False
-                    return
-                time.sleep(0.05)
-                continue
-            break
-        yield True
+        yield _wait_for_lock(lock, path)
+
+
+def _wait_for_lock(lock: BinaryIO, path: Path) -> bool:
+    deadline = time.monotonic() + CREATE_WAIT
+    while True:
+        try:
+            _try_lock(lock)
+            return True
+        except OSError as exc:
+            if exc.errno not in _HELD:
+                return True  # a volume without locks: as before
+        if path.exists() or time.monotonic() > deadline:
+            return False  # created meanwhile (the link will fail), or a hung creator
+        time.sleep(0.05)
 
 
 def _is_askpdf_index(db: sqlite3.Connection) -> bool:

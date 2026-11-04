@@ -1,6 +1,8 @@
+import errno
 import sqlite3
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -316,16 +318,55 @@ def test_a_second_creator_waits_while_one_creates(tmp_path: Path) -> None:
         assert "a.pdf" in store.files()
 
 
+def test_creating_an_index_does_not_make_a_server_think_it_is_busy(tmp_path: Path) -> None:
+    """The flake behind this: a server's indexer took the writer lock while a reader was
+    creating the index, was told "another askpdf is writing", and never indexed."""
+    index = tmp_path / "i.db"
+    Store(index).close()
+    with store_module._creating(index), Store(index) as server, server.writing():
+        pass  # no IndexBusyError
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows cannot delete an open index")
-def test_a_creator_leaves_sidecars_alone_while_another_holds_the_lock(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A server that holds the lock on an index the user deleted keeps writing its WAL."""
-    monkeypatch.setattr(store_module, "CREATE_WAIT", 0.1)
+def test_a_server_whose_index_was_deleted_recreates_it_without_waiting(tmp_path: Path) -> None:
     index = tmp_path / "i.db"
     with Store(index) as server, server.writing():
         index.unlink()
-        wal = Path(f"{index}-wal")
-        wal.write_bytes(b"live")  # stands in for the server's WAL
-        Store._create(index)
-        assert wal.read_bytes() == b"live" and index.exists()
+        start = time.monotonic()
+        with Store(index) as fresh:
+            assert fresh.files() == {}
+        assert time.monotonic() - start < 1.0
+
+
+def test_a_creator_stops_waiting_once_the_index_exists(tmp_path: Path) -> None:
+    index = tmp_path / "i.db"
+    Store(index).close()
+    lock = open(f"{index}.creating", "a+b")  # another creator, hung  # noqa: SIM115
+    try:
+        store_module._try_lock(lock)
+        start = time.monotonic()
+        with store_module._creating(index) as alone:
+            assert not alone
+        assert time.monotonic() - start < 1.0
+    finally:
+        lock.close()
+
+
+def test_a_lock_file_that_cannot_be_opened_does_not_stop_creation(tmp_path: Path) -> None:
+    index = tmp_path / "i.db"
+    Path(f"{index}.creating").mkdir()
+    with store_module._creating(index) as alone:
+        assert alone
+    with Store(index) as store:
+        assert store.files() == {}
+
+
+def test_a_volume_without_locks_does_not_stop_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_locks(file: object) -> None:
+        raise OSError(errno.ENOLCK, "No locks available")
+
+    monkeypatch.setattr(store_module, "_try_lock", no_locks)
+    with store_module._creating(tmp_path / "i.db") as alone:
+        assert alone
