@@ -103,7 +103,7 @@ def answers() -> str:
         f" {an['n_questions']} dev questions, {an['k']} BM25 pages each; {_machine()},"
         f" {DEV_ANSWERS_DATE}:\n\n"
         "| Measure | Result |\n| --- | --- |\n"
-        f"| Citations whose quote is on the cited page |"
+        f"| Citations with a quote found on the cited page |"
         f" {round(g['quote_verified_rate'] * g['n_citations'])} of {g['n_citations']}"
         f" ({_f(g['quote_verified_rate'])}) |\n"
         f"| of those, verified only by folding hyphens | {_f(g['folding_only_share'])} |\n"
