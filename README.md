@@ -5,8 +5,9 @@
 Point askpdf at a folder of PDFs and ask questions about them in your browser. Answers
 cite the pages they came from, and each quoted passage is checked word for word against
 its page, so you can see which claims are backed and which are not (the results below say
-how often a small local model gets there). It runs locally with [Ollama](https://ollama.com); nothing leaves your machine unless
-you opt in to a remote model.
+how often a small local model gets there). It runs locally with
+[Ollama](https://ollama.com); nothing leaves your machine unless you opt in to a remote
+model.
 
 ![askpdf answering a question about a NIST standard, with a checked quote under each citation](docs/screenshots/answer.png)
 
@@ -286,14 +287,14 @@ it said "not found" for 6 of 9 and never for an answerable one.
 
 ### Release v0.1.0: the frozen test split
 
-Everything above was tuned on the development split. The test split was hash-pinned
-when the questions were written and scored once, for this release, after all tuning was
-done; `eval/results/test-v0.1.0.json` holds every per-question result. Two earlier
-contacts with it are logged in [`eval/TUNING.md`](eval/TUNING.md#test-split-exposure): one
-accidental printout of test aggregates, and gold pages added to some test questions, which
-changed the pin. Nothing was tuned from either. The release
-workflow rescores its model-free stages from the tagged commit and refuses to publish
-the release unless they match exactly.
+Every choice above was made on the development split (some settings were never tuned). The
+test split was hash-pinned when the questions were written and scored once, for this
+release, after all tuning was done; `eval/results/test-v0.1.0.json` holds every
+per-question result. Two earlier contacts with it are logged in
+[`eval/TUNING.md`](eval/TUNING.md#test-split-exposure): one accidental printout of test
+aggregates, and gold pages added to some test questions, which changed the pin. Nothing
+was tuned from either. The release workflow rescores its model-free stages from the tagged
+commit and refuses to publish the release unless they match exactly.
 
 <!-- results:test-split -->
 BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets. Answers from llama3.2:3b (Ollama 0.40.5) on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; test split scored 2026-11-02.
@@ -411,7 +412,8 @@ listed in `eval/corpus/SOURCES.md`.
   tens of thousands.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
-  2 chunks a second on the Intel Mac this was built on (timed by hand, not in a results file), so a 130-page report takes about
+  2 chunks a second on the Intel Mac this was built on (timed by hand, not in a results
+  file), so a 130-page report takes about
   three minutes the first time. Later runs only embed what changed.
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.

@@ -125,3 +125,15 @@ def test_only_http_urls_are_accepted() -> None:
 def test_normalise_leaves_zero_vectors_alone() -> None:
     m = normalise([[3.0, 4.0], [0.0, 0.0]])
     assert np.allclose(m, [[0.6, 0.8], [0.0, 0.0]])
+
+
+@pytest.mark.parametrize(
+    ("url", "shown"),
+    [
+        ("https://user:pw@api.example.com/v1", "api.example.com"),
+        ("http://gpu-box:11434", "gpu-box:11434"),
+        ("http://[2001:db8::1]:11434/", "[2001:db8::1]:11434"),
+    ],
+)
+def test_where_names_the_host_without_userinfo(url: str, shown: str) -> None:
+    assert http.where(url) == shown

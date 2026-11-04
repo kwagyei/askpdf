@@ -79,7 +79,8 @@ def _request(url: str, payload: Mapping[str, Any], headers: Mapping[str, str]) -
 def where(url: str) -> str:
     """Host and port only: never userinfo, which may hold a password."""
     parts = urlsplit(url)
-    return f"{parts.hostname}:{parts.port}" if parts.port else str(parts.hostname)
+    host = f"[{parts.hostname}]" if ":" in (parts.hostname or "") else str(parts.hostname)
+    return f"{host}:{parts.port}" if parts.port else host
 
 
 def _redact(text: str, headers: Mapping[str, str]) -> str:
