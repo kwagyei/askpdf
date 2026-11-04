@@ -1,8 +1,11 @@
 import sqlite3
+import sys
+import threading
 from pathlib import Path
 
 import pytest
 
+from askpdf import store as store_module
 from askpdf.store import (
     SCHEMA_VERSION,
     ChunkRecord,
@@ -289,3 +292,40 @@ def test_only_one_writer_holds_an_index(tmp_path: Path) -> None:
             pass
         with second.writing():  # released when the first is done
             pass
+
+
+def test_a_second_creator_waits_while_one_creates(tmp_path: Path) -> None:
+    """Clearing a deleted index's -wal and linking the new index happen under the lock,
+    so no creator can clear the live WAL of one that linked first (seen in CI as "not an
+    askpdf index")."""
+    index = tmp_path / "i.db"
+    done = threading.Event()
+
+    def create() -> None:
+        with Store(index) as store:
+            store.put_file(FileRow("a.pdf", "ab", 1, 1, "failed", "e"))
+        done.set()
+
+    with store_module._creating(index) as alone:
+        assert alone
+        thread = threading.Thread(target=create, daemon=True)
+        thread.start()
+        assert not done.wait(0.3) and not index.exists()
+    thread.join(10)
+    with Store(index) as store:
+        assert "a.pdf" in store.files()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows cannot delete an open index")
+def test_a_creator_leaves_sidecars_alone_while_another_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A server that holds the lock on an index the user deleted keeps writing its WAL."""
+    monkeypatch.setattr(store_module, "CREATE_WAIT", 0.1)
+    index = tmp_path / "i.db"
+    with Store(index) as server, server.writing():
+        index.unlink()
+        wal = Path(f"{index}-wal")
+        wal.write_bytes(b"live")  # stands in for the server's WAL
+        Store._create(index)
+        assert wal.read_bytes() == b"live" and index.exists()

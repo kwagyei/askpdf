@@ -186,6 +186,7 @@ def test_index_through_a_symlink_into_the_folder_is_excluded(root: Path, tmp_pat
 @pytest.mark.skipif(not POSIX, reason="directory-as-lock-file is POSIX behaviour")
 def test_lock_file_that_cannot_be_opened_is_not_reported_as_busy(tmp_path: Path) -> None:
     with Store(tmp_path / "i.db") as store:
+        (tmp_path / "i.db.lock").unlink()  # left by creating the index
         (tmp_path / "i.db.lock").mkdir()
         with pytest.raises(OSError) as info, store.writing():
             pass
@@ -211,6 +212,7 @@ def test_index_command_with_an_unopenable_lock_file_exits_cleanly(
     index = tmp_path / "i.db"
     with Store(index):
         pass
+    (tmp_path / "i.db.lock").unlink()  # left by creating the index
     (tmp_path / "i.db.lock").mkdir()
     assert main(["index", str(root), "--index", str(index)]) == 1
 
