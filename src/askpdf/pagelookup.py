@@ -26,11 +26,10 @@ from askpdf.quotes import QuoteCheck
 from askpdf.retrieve import PageHit
 from askpdf.snapshot import Chunk, Snapshot
 
-# "page 5", "p. 5", "pg 12", "page iv", "PDF page 5"; the number must stand alone. Only
-# well-formed Roman numerals count, so "page did" or "page mid" is not a page.
-_ROMAN = r"(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})"
+# "page 5", "p. 5", "pg 12", "page iv", "PDF page 5"; the number must stand alone. Words
+# such as "did" fit the Roman letters too; _page keeps only labels a document prints.
 _PAGE = re.compile(
-    rf"(?<![\w.])(?P<pdf>pdf\s+)?(?:page|pg\.?|p\.)\s*(?P<n>\d{{1,5}}|{_ROMAN})(?![\w])",
+    r"(?<![\w.])(?P<pdf>pdf\s+)?(?:page|pg\.?|p\.)\s*(?P<n>\d{1,5}|[ivxlcdm]{1,8})(?![\w])",
     re.I,
 )
 _WORD = re.compile(r"[^\W_]+")

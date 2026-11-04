@@ -50,7 +50,18 @@ def test_the_corpus_and_dev_questions_are_there() -> None:
     assert len(CORPUS) >= 4 and len(_dev_questions()) >= 58
 
 
-@pytest.mark.parametrize("question", _dev_questions())
+# No dev question has a word after "page", so these carry the check that a word is not a
+# page number: each one routed before v0.1.1.
+WORDS_AFTER_PAGE = [
+    "On which page did NIST define MFA?",
+    "Which page did nist-sp-800-63b-4 say that on?",
+    "which page mid-way through naca-rm-l56l14a covers flutter?",
+    "is p. ill used in qasper-2105.03011v1?",
+    "On what page civil aviation is mentioned in the naca memorandum?",
+]
+
+
+@pytest.mark.parametrize("question", [*_dev_questions(), *WORDS_AFTER_PAGE])
 def test_no_dev_question_skips_search(question: str, snapshot: Snapshot) -> None:
     assert find_page(question, snapshot) is None
 
