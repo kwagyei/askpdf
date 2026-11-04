@@ -58,6 +58,11 @@ a { color: var(--accent); }
 .brand { display: flex; align-items: baseline; gap: 10px; }
 .brand h1 { margin: 0; font-size: 1.15rem; letter-spacing: 0.01em; }
 .status { margin: 0 auto 0 0; font-size: 0.9rem; color: var(--muted); }
+/* Stays in the sticky bar for as long as excerpts leave this machine (ADR-0005). */
+.remote {
+  flex-basis: 100%; margin: 0; padding: 6px 10px;
+  background: var(--warn-bg); border-radius: 8px; font-size: 0.9rem;
+}
 
 button {
   font: inherit; cursor: pointer;

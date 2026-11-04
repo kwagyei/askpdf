@@ -558,6 +558,70 @@ def test_the_indexer_waits_while_an_answer_is_written(folder: Path) -> None:
     assert shared[0].idle.is_set()  # free again once the answer is written
 
 
+# --- remote models (ADR-0005) ---------------------------------------------------------------
+
+
+def test_docs_names_no_remote_host_by_default(client: TestClient) -> None:
+    assert client.get("/api/docs").json()["remote"] == []
+
+
+def test_docs_names_the_remote_hosts_for_the_banner(folder: Path) -> None:
+    with _client(_app(folder, remote=["api.example.com"])) as client:
+        assert client.get("/api/docs").json()["remote"] == ["api.example.com"]
+
+
+def test_the_page_has_a_place_for_the_banner(client: TestClient) -> None:
+    assert 'id="remote"' in client.get("/").text
+
+
+@pytest.mark.parametrize(
+    ("extra", "ollama_url", "hosts"),
+    [
+        ([], "http://127.0.0.1:11434", []),
+        ([], "http://gpu-box:11434", ["gpu-box:11434"]),
+        (
+            ["--api-url", "https://user:pw@api.example.com/v1"],
+            "http://127.0.0.1:9",
+            ["api.example.com"],
+        ),
+        (["--api-url", "http://localhost:8000/v1"], "http://gpu-box:11434", []),
+        (
+            ["--api-url", "http://localhost:8000/v1", "--retriever", "dense"],
+            "http://gpu-box:11434",
+            ["gpu-box:11434"],
+        ),
+        (
+            ["--api-url", "https://api.example.com/v1", "--retriever", "hybrid"],
+            "http://gpu-box:11434",
+            ["api.example.com", "gpu-box:11434"],
+        ),
+    ],
+)
+def test_remote_hosts_are_those_that_receive_questions_or_text(
+    extra: list[str],
+    ollama_url: str,
+    hosts: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ASKPDF_OLLAMA_URL", ollama_url)
+    args = build_parser().parse_args(["serve", str(tmp_path), "--model", "m", *extra])
+    assert cli._remote_hosts(args) == hosts
+
+
+def test_serve_refuses_a_remote_embedder_with_a_message_not_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("ASKPDF_OLLAMA_URL", "http://gpu-box:11434")
+    monkeypatch.setenv("ASKPDF_API_KEY", "sk-test")
+    monkeypatch.delenv("ASKPDF_ALLOW_REMOTE", raising=False)
+    (tmp_path / "g").mkdir()
+    argv = ["serve", str(tmp_path / "g"), "--index", str(tmp_path / "j.db"), "--no-browser"]
+    argv += ["--api-url", "http://localhost:8000/v1", "--model", "m", "--retriever", "dense"]
+    assert main(argv) == 1
+    assert "gpu-box is not this machine" in capsys.readouterr().err
+
+
 def test_without_an_indexer_the_index_is_ready(client: TestClient) -> None:
     (event,) = _events(client.get("/api/events").text)
     assert event[1]["state"] == "ready"

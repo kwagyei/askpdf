@@ -67,6 +67,12 @@ async function newConversation() {
 async function loadDocs() {
   const data = await (await fetch("/api/docs")).json();
   $("folder").textContent = data.folder;
+  const remote = $("remote");
+  remote.hidden = data.remote.length === 0;
+  remote.textContent = data.remote.length
+    ? `Your questions and excerpts of your documents are sent to ${data.remote.join(" and ")}, ` +
+      "which is not this machine."
+    : "";
   const docs = $("docs");
   docs.replaceChildren();
   for (const doc of data.documents) {
