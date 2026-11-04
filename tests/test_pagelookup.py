@@ -160,6 +160,27 @@ def test_roman_page_labels_are_found(snapshot: Snapshot) -> None:
     assert _pages("page II of the annual report", snapshot) == [2]
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "On which page did NIST define MFA?",
+        "Which page did they define passwords on?",
+        "which page mid-way through the report covers methods?",
+        "is p. ill the abbreviation used here?",
+        "page mix of the annual report",  # a valid numeral no document prints
+        "page iv of the annual report",
+    ],
+)
+def test_words_and_unprinted_numerals_after_page_are_searched(
+    question: str, snapshot: Snapshot
+) -> None:
+    assert find_page(question, snapshot) is None
+
+
+def test_a_later_page_number_is_found_after_a_word_that_is_not_one(snapshot: Snapshot) -> None:
+    assert _pages("which page did it say, page 2 of the annual report?", snapshot) == [4, 2]
+
+
 def test_a_page_that_does_not_exist_is_said_plainly(snapshot: Snapshot) -> None:
     lookup = find_page("page 99 of the annual report", snapshot)
     assert lookup is not None and lookup.hits == [] and lookup.answer is None
