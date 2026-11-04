@@ -16,7 +16,8 @@ _SENTENCE_END = re.compile("[.!?\u2026][\"'\u201d\u2019)\\]]*$")
 
 @dataclass(frozen=True, slots=True)
 class ChunkParams:
-    """Starting values; all three are tuned on the dev split only (design §11)."""
+    """Untuned defaults: chunk size was never tuned for v0.1.0 (ADR-0004 Amendment 1).
+    Any tuning would use the dev split only (design §11)."""
 
     target: int = 220
     overlap: int = 40

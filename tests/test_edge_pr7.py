@@ -250,6 +250,8 @@ def test_hostile_replies_parse_in_linear_time() -> None:
         "Quotes:\n" + "[1] " * 5000,
         "a [1]\nQuotes:\n[1] " + "a " * n + "b",
         "[1] " + "\u00a0" * 1000,
+        "Quotes:\n" + "-\n" * n,  # punctuation lines: a prefix crossing lines is quadratic
+        "Quotes:\n" + "_\n" * n,
     ]
     start = time.perf_counter()
     for raw in replies:

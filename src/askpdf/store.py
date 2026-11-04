@@ -12,6 +12,7 @@ import os
 import sqlite3
 import sys
 import threading
+import time
 import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -217,6 +218,40 @@ else:
         fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
+CREATE_WAIT = 5.0  # a creator holds its lock for milliseconds; this bounds a hung one
+
+
+@contextmanager
+def _creating(path: Path) -> Iterator[bool]:
+    """Hold ``{path}.creating`` while creating the index; True if no other creator can be
+    between its check and its link, so a deleted index's -wal and -shm are safe to clear.
+    It is not the writer lock: a server taking that while another process creates the
+    index must not be told the index is busy."""
+    try:
+        lock = open(f"{path}.creating", "a+b")  # noqa: SIM115 - closed below
+    except OSError:
+        lock = None
+    if lock is None:
+        yield True  # no lock file possible: as before, nothing to coordinate with
+        return
+    with lock:
+        yield _wait_for_lock(lock, path)
+
+
+def _wait_for_lock(lock: BinaryIO, path: Path) -> bool:
+    deadline = time.monotonic() + CREATE_WAIT
+    while True:
+        try:
+            _try_lock(lock)
+            return True
+        except OSError as exc:
+            if exc.errno not in _HELD:
+                return True  # a volume without locks: as before
+        if path.exists() or time.monotonic() > deadline:
+            return False  # created meanwhile (the link will fail), or a hung creator
+        time.sleep(0.05)
+
+
 def _is_askpdf_index(db: sqlite3.Connection) -> bool:
     try:
         row = db.execute("SELECT value FROM meta WHERE key = 'app'").fetchone()
@@ -278,19 +313,22 @@ class Store:
             db.execute("PRAGMA journal_mode = WAL")
         finally:
             db.close()
-        if not path.exists():
-            # A WAL left beside a deleted index would be replayed into the new one.
-            for suffix in ("-wal", "-shm"):
-                Path(f"{path}{suffix}").unlink(missing_ok=True)
-        try:
-            os.link(tmp, path)
-        except FileExistsError:
-            pass  # another process won the race
-        except OSError:
-            # A filesystem without hard links (FAT, some network shares): no atomic
-            # create-if-absent, so fall back to a plain move.
-            if not path.exists():
-                os.replace(tmp, path)
+        with _creating(path) as alone:
+            if alone and not path.exists():
+                # A WAL left beside a deleted index would be replayed into the new one.
+                # Only under the lock: another creator may link its index and start
+                # writing its WAL between this check and the unlink.
+                for suffix in ("-wal", "-shm"):
+                    Path(f"{path}{suffix}").unlink(missing_ok=True)
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                pass  # another process won the race
+            except OSError:
+                # A filesystem without hard links (FAT, some network shares): no atomic
+                # create-if-absent, so fall back to a plain move.
+                if not path.exists():
+                    os.replace(tmp, path)
         tmp.unlink(missing_ok=True)
 
     def _rebuild(self) -> None:

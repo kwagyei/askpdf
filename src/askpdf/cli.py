@@ -893,11 +893,21 @@ def _update(
     return None
 
 
+def _remote_hosts(args: argparse.Namespace) -> list[str]:
+    """The hosts off this machine that receive questions or document text: the chat
+    endpoint, and Ollama when it embeds. Shown at start and in the page (ADR-0005)."""
+    urls = [args.api_url or ollama.base_url()]
+    if args.retriever != "bm25":
+        urls.append(ollama.base_url())
+    return sorted({http.where(url) for url in urls if not http.is_local(url)})
+
+
 def _retriever(args: argparse.Namespace) -> Callable[[Snapshot, str, int], Search]:
-    """The web app's search: the chosen retriever, with the same fallbacks as the CLI."""
+    """The web app's search: the chosen retriever, with the same fallbacks as the CLI.
+    Raises ProviderError when the embedder's host is remote and not allowed."""
     embed = None
     if args.retriever != "bm25":
-        embed = _embedder(args).embed_query  # the remote check already passed in _chat
+        embed = _embedder(args).embed_query
 
     def retrieve(snapshot: Snapshot, question: str, k: int) -> Search:
         return search(snapshot, question, k, args.retriever, embed)
@@ -914,8 +924,11 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, f"{args.path} is not a folder")
     try:
         chat = _chat(args)
+        retrieve = _retriever(args)  # with --api-url, Ollama's host is checked only here
     except http.ProviderError as exc:
         return _error(err, exc)
+    for host in _remote_hosts(args):
+        print(f"note: questions and document excerpts are sent to {host}", file=err)
     store = _open_store(args, err)  # creates the index, so readers find one
     if store is None:
         return 1
@@ -942,9 +955,10 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         port=port,
         token=token,
         chat_for=lambda question, hits, texts: sized(chat, question, hits, texts),
-        retrieve=_retriever(args),
+        retrieve=retrieve,
         index_folder=_index_in_background(args, err),
         on_start=started,
+        remote=_remote_hosts(args),
     )
     # 127.0.0.1 only, with no option to change it (ADR-0008).
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")

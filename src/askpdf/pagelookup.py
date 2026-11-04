@@ -26,7 +26,8 @@ from askpdf.quotes import QuoteCheck
 from askpdf.retrieve import PageHit
 from askpdf.snapshot import Chunk, Snapshot
 
-# "page 5", "p. 5", "pg 12", "page iv", "PDF page 5"; the number must stand alone.
+# "page 5", "p. 5", "pg 12", "page iv", "PDF page 5"; the number must stand alone. Words
+# such as "did" fit the Roman letters too; _page keeps only labels a document prints.
 _PAGE = re.compile(
     r"(?<![\w.])(?P<pdf>pdf\s+)?(?:page|pg\.?|p\.)\s*(?P<n>\d{1,5}|[ivxlcdm]{1,8})(?![\w])",
     re.I,
@@ -183,11 +184,25 @@ def _hit(snapshot: Snapshot, sha: str, page: int) -> PageHit:
     )
 
 
+def _page(question: str, snapshot: Snapshot) -> re.Match[str] | None:
+    """The first page number in the question. A Roman numeral counts only when some
+    document prints it as a page label, so "on which page did NIST define MFA?" is
+    searched rather than read as page "did". A capital I alone is the pronoun."""
+    printed = {label.casefold() for label in snapshot.labels.values()}
+    for match in _PAGE.finditer(question):
+        wanted = match.group("n")
+        if wanted == "I":
+            continue  # the pronoun: "on which page I can find it", not page i
+        if wanted.isdecimal() or wanted.casefold() in printed:
+            return match
+    return None
+
+
 def find_page(question: str, snapshot: Snapshot, earlier: Sequence[str] = ()) -> Lookup | None:
     """The page a question names, or None if it names none. A follow-up such as "and
     page 6?" takes the document from the earlier questions. A request to summarise a
     whole document or chapter gets a plain reply, with no pages."""
-    match = _PAGE.search(question)
+    match = _page(question, snapshot)
     if match is None:
         return _summary(question, snapshot)
     sha, tied = _document(snapshot, [question, *reversed(earlier)])

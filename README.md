@@ -2,10 +2,12 @@
 
 [![CI](https://github.com/kwagyei/askpdf/actions/workflows/ci.yml/badge.svg)](https://github.com/kwagyei/askpdf/actions/workflows/ci.yml)
 
-Point askpdf at a folder of PDFs and ask questions about them in your browser. Every answer
-cites the page it came from, and each quoted passage is checked word for word against that
-page. It runs locally with [Ollama](https://ollama.com); nothing leaves your machine unless
-you opt in to a remote model.
+Point askpdf at a folder of PDFs and ask questions about them in your browser. Answers
+cite the pages they came from, and each quoted passage is checked word for word against
+its page, so you can see which claims are backed and which are not (the results below say
+how often a small local model gets there). It runs locally with
+[Ollama](https://ollama.com); nothing leaves your machine unless you opt in to a remote
+model.
 
 ![askpdf answering a question about a NIST standard, with a checked quote under each citation](docs/screenshots/answer.png)
 
@@ -24,6 +26,21 @@ askpdf ~/Documents/papers        # indexes the folder, watches it, opens the bro
 Without Ollama, indexing and keyword search still work, and askpdf says why answers are
 not available. On a laptop without a GPU an answer takes one to three minutes (measured
 below).
+
+### With a remote model
+
+A bigger model can answer instead, through any OpenAI-compatible API. The key is read
+from `ASKPDF_API_KEY` only, and an endpoint that is not this machine also needs
+`--allow-remote`, since the pages given to the model go there:
+
+```sh
+export ASKPDF_API_KEY=...
+askpdf ~/Documents/papers --api-url https://api.example.com/v1 --model some-model --allow-remote
+```
+
+askpdf then prints which host receives your questions and excerpts, and the page keeps a
+banner naming it for as long as it is open. Replies are capped at 768 tokens, as they are
+with Ollama.
 
 ### From the command line
 
@@ -150,7 +167,7 @@ Each of these has a test (`tests/test_web.py`).
 PDFs added to, changed in or deleted from the folder show up in the page without a
 restart. The folder is polled every 2 seconds rather than watched with OS events: polling
 needs no dependency and behaves the same on macOS, Linux, Windows, iCloud and network
-folders, at a cost that is small for hundreds of PDFs. A file is read only once its size
+folders, at a cost meant for hundreds of PDFs (not measured). A file is read only once its size
 and modification time are the same in two scans in a row, so a file still being copied or
 downloaded is never indexed half-written; it does not hold up the other files meanwhile.
 Files are keyed by content, so a renamed or copied PDF is recorded without being read
@@ -171,10 +188,11 @@ longer. The deletes were each made just after a scan, so they show the slowest c
 made at a random moment is picked up within 0–2 s. With `--retriever hybrid` the new
 chunks are also embedded, which takes much longer (see the limitations).
 
-Indexing never competes with an answer: while one is being written the indexer waits
-before its next file or batch of embeddings. Only one askpdf process writes an index at a
-time (an OS file lock); a second `askpdf serve` on the same folder shows the index as it
-is and says so, and `askpdf index` refuses with a clear message.
+Indexing gives way to answers: while one is being written the indexer waits before its
+next file or batch of embeddings (a file or batch already started finishes first). Only
+one askpdf process writes an index at a time (an OS file lock); a second `askpdf serve` on
+the same folder shows the index as it is and says so, and `askpdf index` refuses with a
+clear message.
 
 #### Opening a citation at its page
 
@@ -266,7 +284,7 @@ Answers from llama3.2:3b (Ollama 0.40.5) on the 58 dev questions, 3 BM25 pages e
 
 | Measure | Result |
 | --- | --- |
-| Citations whose quote is on the cited page | 11 of 59 (0.186) |
+| Citations with a quote found on the cited page | 11 of 59 (0.186) |
 | of those, verified only by folding hyphens | 0.000 |
 | Answer sentences carrying a verified citation | 0.159 |
 | Answers with at least one verified citation | 0.224 of 49 (95% interval 0.12 to 0.35) |
@@ -285,11 +303,14 @@ it said "not found" for 6 of 9 and never for an answerable one.
 
 ### Release v0.1.0: the frozen test split
 
-Everything above was tuned on the development split. The test split was hash-pinned
-when the questions were written and scored once, for this release, after all tuning was
-done; `eval/results/test-v0.1.0.json` holds every per-question result. The release
-workflow rescores its model-free stages from the tagged commit and refuses to publish
-the release unless they match exactly.
+Every choice above was made on the development split (some settings were never tuned). The
+test split was hash-pinned when the questions were written and scored once, for this
+release, after all tuning was done; `eval/results/test-v0.1.0.json` holds every
+per-question result. Two earlier contacts with it are logged in
+[`eval/TUNING.md`](eval/TUNING.md#test-split-exposure): one accidental printout of test
+aggregates, and gold pages added to some test questions, which changed the pin. Nothing
+was tuned from either. The release workflow rescores its model-free stages from the tagged
+commit and refuses to publish the release unless they match exactly.
 
 <!-- results:test-split -->
 BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets. Answers from llama3.2:3b (Ollama 0.40.5) on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; test split scored 2026-11-02.
@@ -407,7 +428,8 @@ listed in `eval/corpus/SOURCES.md`.
   tens of thousands.
 
 - Semantic search needs Ollama running locally, and embedding is slow on a CPU: about
-  2 chunks a second on the Intel Mac this was built on, so a 130-page report takes about
+  2 chunks a second on the Intel Mac this was built on (timed by hand, not in a results
+  file), so a 130-page report takes about
   three minutes the first time. Later runs only embed what changed.
 - No OCR: scanned pages without a text layer are detected and flagged, not read.
 - Text is read with pypdf; tables and two-column layouts may come out in an odd order.

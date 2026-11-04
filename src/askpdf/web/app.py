@@ -384,9 +384,12 @@ def create_app(
     index_folder: Callable[[Progress], None] | None = None,
     on_start: Callable[[], None] | None = None,
     k: int = ANSWER_K,
+    remote: Sequence[str] = (),
 ) -> ASGIApp:
     """The app, wrapped in its request checks. ``index_folder`` runs in a thread at
-    start-up and reports through ``Progress``; without it the index is taken as ready."""
+    start-up and reports through ``Progress``; without it the index is taken as ready.
+    ``remote`` names the hosts off this machine that the models run on; the page shows
+    them in a banner for as long as it is open (ADR-0005)."""
     library = Library(root, index)
     progress = Progress() if index_folder else Progress(state="ready")
     conversations = Conversations()
@@ -430,7 +433,7 @@ def create_app(
 
     @app.get("/api/docs")
     def docs() -> dict[str, Any]:
-        return {"folder": library.root.name, **library.documents()}
+        return {"folder": library.root.name, "remote": list(remote), **library.documents()}
 
     @app.post("/api/conversations")
     def new_conversation() -> dict[str, str]:

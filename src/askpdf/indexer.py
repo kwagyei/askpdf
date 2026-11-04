@@ -145,9 +145,8 @@ def read_bytes(path: Path, timeout: float = READ_TIMEOUT) -> bytes:
 
 def own_files(index: Path) -> frozenset[Path]:
     """The index and SQLite's files beside it, which may sit inside the folder (--index)."""
-    return frozenset(
-        Path(f"{index.resolve()}{suffix}") for suffix in ("", "-wal", "-shm", "-journal", ".lock")
-    )
+    suffixes = ("", "-wal", "-shm", "-journal", ".lock", ".creating")
+    return frozenset(Path(f"{index.resolve()}{suffix}") for suffix in suffixes)
 
 
 def sha256_bytes(data: bytes) -> str:

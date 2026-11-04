@@ -59,7 +59,7 @@ def is_local(url: str) -> bool:
 def require_local_or_allowed(url: str, allow_remote: bool) -> None:
     """Refuse to send document text off this machine unless the user allowed it."""
     if urlsplit(url).scheme not in {"http", "https"}:
-        raise ProviderError(f"unsupported URL scheme in {url!r}")
+        raise ProviderError(f"unsupported URL scheme {urlsplit(url).scheme!r}")
     if not is_local(url) and not allow_remote:
         host = urlsplit(url).hostname
         raise RemoteNotAllowedError(
@@ -70,16 +70,17 @@ def require_local_or_allowed(url: str, allow_remote: bool) -> None:
 
 def _request(url: str, payload: Mapping[str, Any], headers: Mapping[str, str]) -> Any:
     if urlsplit(url).scheme not in {"http", "https"}:
-        raise ProviderError(f"unsupported URL scheme in {url!r}")
+        raise ProviderError(f"unsupported URL scheme {urlsplit(url).scheme!r}")
     data = json.dumps(payload).encode("utf-8")
     all_headers = {"Content-Type": "application/json", **headers}
     return urllib.request.Request(url, data=data, headers=all_headers, method="POST")  # noqa: S310 - scheme checked above
 
 
-def _where(url: str) -> str:
+def where(url: str) -> str:
     """Host and port only: never userinfo, which may hold a password."""
     parts = urlsplit(url)
-    return f"{parts.hostname}:{parts.port}" if parts.port else str(parts.hostname)
+    host = f"[{parts.hostname}]" if ":" in (parts.hostname or "") else str(parts.hostname)
+    return f"{host}:{parts.port}" if parts.port else host
 
 
 def _redact(text: str, headers: Mapping[str, str]) -> str:
@@ -97,11 +98,11 @@ def _describe(url: str, exc: Exception, headers: Mapping[str, str]) -> ProviderE
         detail = exc.read(500).decode("utf-8", "replace").strip()
         if 300 <= exc.code < 400:
             detail = "redirects are not followed"
-        return ProviderError(f"{_where(url)} answered HTTP {exc.code}: {_redact(detail, headers)}")
+        return ProviderError(f"{where(url)} answered HTTP {exc.code}: {_redact(detail, headers)}")
     if isinstance(exc, urllib.error.URLError | ConnectionError | TimeoutError):
         reason = getattr(exc, "reason", exc)
-        return UnreachableError(f"cannot reach {_where(url)}: {reason}")
-    return ProviderError(f"bad answer from {_where(url)}: {type(exc).__name__}")
+        return UnreachableError(f"cannot reach {where(url)}: {reason}")
+    return ProviderError(f"bad answer from {where(url)}: {type(exc).__name__}")
 
 
 def post_json(
@@ -117,19 +118,19 @@ def post_json(
     except _FAILURES as exc:
         raise _describe(url, exc, headers) from exc
     except ValueError as exc:  # not JSON
-        raise ProviderError(f"{_where(url)} did not answer with JSON") from exc
+        raise ProviderError(f"{where(url)} did not answer with JSON") from exc
 
 
 def get_json(url: str, timeout: float = 10.0) -> Any:
     if urlsplit(url).scheme not in {"http", "https"}:
-        raise ProviderError(f"unsupported URL scheme in {url!r}")
+        raise ProviderError(f"unsupported URL scheme {urlsplit(url).scheme!r}")
     try:
         with _OPENER.open(url, timeout=timeout) as r:
             return json.load(r)
     except _FAILURES as exc:
         raise _describe(url, exc, {}) from exc
     except ValueError as exc:
-        raise ProviderError(f"{_where(url)} did not answer with JSON") from exc
+        raise ProviderError(f"{where(url)} did not answer with JSON") from exc
 
 
 def stream_lines(
@@ -156,4 +157,4 @@ def stream_lines(
             if getattr(response, "length", None):
                 raise http.client.IncompleteRead(b"", response.length)
         except _FAILURES as exc:
-            raise ProviderError(f"the answer from {_where(url)} broke off") from exc
+            raise ProviderError(f"the answer from {where(url)} broke off") from exc
