@@ -83,6 +83,7 @@ def test_byok_chat_streams_sse_and_sends_the_key_only_in_the_header() -> None:
     assert headers["Authorization"] == "Bearer sk-secret"
     assert "sk-secret" not in str(body)
     assert "sk-secret" not in repr(chat)
+    assert body["max_tokens"] == 768  # a runaway reply is cut off, as with Ollama
 
 
 def test_byok_reads_the_key_from_the_environment_only(monkeypatch: pytest.MonkeyPatch) -> None:

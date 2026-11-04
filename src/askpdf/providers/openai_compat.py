@@ -19,6 +19,7 @@ class OpenAICompatChat:
     url: str  # e.g. https://api.example.com/v1
     model: str
     api_key: str = field(repr=False)
+    max_tokens: int = 768  # as for Ollama: caps the time a runaway answer takes
 
     def stream(self, system: str, user: str) -> Iterator[str]:
         payload = {
@@ -26,6 +27,7 @@ class OpenAICompatChat:
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "stream": True,
             "temperature": 0,
+            "max_tokens": self.max_tokens,
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
         for line in http.stream_lines(f"{self.url}/chat/completions", payload, headers):
@@ -40,12 +42,14 @@ class OpenAICompatChat:
                 if not isinstance(piece, str):
                     raise TypeError(piece)
             except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
-                message = f"unexpected event from {self.url}: {data[:200]!r}"
+                message = f"unexpected event from {http.where(self.url)}: {data[:200]!r}"
                 raise http.ProviderError(message) from exc
             if piece:
                 yield piece
         # The stream closed without [DONE]: the answer may be cut short.
-        raise http.ProviderError(f"the answer from {self.url} ended before it was complete")
+        raise http.ProviderError(
+            f"the answer from {http.where(self.url)} ended before it was complete"
+        )
 
 
 def allow_remote(flag: bool = False) -> bool:
