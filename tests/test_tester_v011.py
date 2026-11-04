@@ -129,5 +129,5 @@ def test_serve_prints_one_note_per_remote_host(
 
 
 def test_banner_script_uses_text_content_only() -> None:
-    js = (Path(__file__).parent.parent / "src/askpdf/web/static/app.js").read_text()
+    js = (Path(__file__).parent.parent / "src/askpdf/web/static/app.js").read_text(encoding="utf-8")
     assert "innerHTML" not in js and "insertAdjacentHTML" not in js
