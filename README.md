@@ -27,6 +27,21 @@ Without Ollama, indexing and keyword search still work, and askpdf says why answ
 not available. On a laptop without a GPU an answer takes one to three minutes (measured
 below).
 
+### With a remote model
+
+A bigger model can answer instead, through any OpenAI-compatible API. The key is read
+from `ASKPDF_API_KEY` only, and an endpoint that is not this machine also needs
+`--allow-remote`, since the pages given to the model go there:
+
+```sh
+export ASKPDF_API_KEY=...
+askpdf ~/Documents/papers --api-url https://api.example.com/v1 --model some-model --allow-remote
+```
+
+askpdf then prints which host receives your questions and excerpts, and the page keeps a
+banner naming it for as long as it is open. Replies are capped at 768 tokens, as they are
+with Ollama.
+
 ### From the command line
 
 ```sh
@@ -174,9 +189,10 @@ made at a random moment is picked up within 0–2 s. With `--retriever hybrid` t
 chunks are also embedded, which takes much longer (see the limitations).
 
 Indexing gives way to answers: while one is being written the indexer waits before its
-next file or batch of embeddings (a file or batch already started finishes first). Only one askpdf process writes an index at a
-time (an OS file lock); a second `askpdf serve` on the same folder shows the index as it
-is and says so, and `askpdf index` refuses with a clear message.
+next file or batch of embeddings (a file or batch already started finishes first). Only
+one askpdf process writes an index at a time (an OS file lock); a second `askpdf serve` on
+the same folder shows the index as it is and says so, and `askpdf index` refuses with a
+clear message.
 
 #### Opening a citation at its page
 

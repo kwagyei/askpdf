@@ -187,10 +187,12 @@ def _hit(snapshot: Snapshot, sha: str, page: int) -> PageHit:
 def _page(question: str, snapshot: Snapshot) -> re.Match[str] | None:
     """The first page number in the question. A Roman numeral counts only when some
     document prints it as a page label, so "on which page did NIST define MFA?" is
-    searched rather than read as page "di"."""
+    searched rather than read as page "did". A capital I alone is the pronoun."""
     printed = {label.casefold() for label in snapshot.labels.values()}
     for match in _PAGE.finditer(question):
         wanted = match.group("n")
+        if wanted == "I":
+            continue  # the pronoun: "on which page I can find it", not page i
         if wanted.isdecimal() or wanted.casefold() in printed:
             return match
     return None

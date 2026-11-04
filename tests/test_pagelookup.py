@@ -158,6 +158,8 @@ def test_pdf_page_means_the_page_of_the_file(snapshot: Snapshot) -> None:
 def test_roman_page_labels_are_found(snapshot: Snapshot) -> None:
     assert _pages("page ii of the annual report", snapshot) == [2]
     assert _pages("page II of the annual report", snapshot) == [2]
+    assert _pages("page i of the annual report", snapshot) == [1]
+    assert find_page("on which page I can read the annual report methods?", snapshot) is None
 
 
 @pytest.mark.parametrize(
