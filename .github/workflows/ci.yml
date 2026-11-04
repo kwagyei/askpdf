@@ -90,10 +90,10 @@ jobs:
           diff -u eval/results/dev-conversation-bm25.json "$RUNNER_TEMP/conversation.json"
       # The release workflow runs these on a tag; running them here as well means a
       # change that moves a frozen test-split number fails its PR, before any tag exists.
-      - name: Test split (v0.1.0) still reproduces exactly
+      - name: Test split (v0.1.1) still reproduces exactly
         run: |
-          askpdf eval retrieval --split test --release v0.1.0 --check
-          askpdf eval conversation --split test --release v0.1.0 --check
+          askpdf eval retrieval --split test --release v0.1.1 --check
+          askpdf eval conversation --split test --release v0.1.1 --check
       - name: Hand-rolled metrics agree with pytrec_eval
         run: |
           python -m pip install --group dev -c eval/constraints.txt

@@ -17,7 +17,7 @@ askpdf needs Python 3.12 or newer and [Ollama](https://ollama.com) for answers. 
 installed from GitHub, not PyPI:
 
 ```sh
-pipx install git+https://github.com/kwagyei/askpdf@v0.1.0
+pipx install git+https://github.com/kwagyei/askpdf@v0.1.1
 ollama pull llama3.2:3b          # answers (2 GB)
 ollama pull nomic-embed-text     # optional: search by meaning (270 MB)
 askpdf ~/Documents/papers        # indexes the folder, watches it, opens the browser
@@ -311,6 +311,12 @@ per-question result. Two earlier contacts with it are logged in
 aggregates, and gold pages added to some test questions, which changed the pin. Nothing
 was tuned from either. The release workflow rescores its model-free stages from the tagged
 commit and refuses to publish the release unless they match exactly.
+
+v0.1.1 (2026-11-04) fixed bugs without changing search or how answers are made, so it
+scored only the model-free stages again: `eval/results/test-v0.1.1.json` matches v0.1.0
+exactly. The answers were not re-run, so the answer numbers and correctness labels below
+are v0.1.0's; reply parsing changed only in speed (identical output on 200,000 generated
+replies). See [CHANGELOG.md](CHANGELOG.md).
 
 <!-- results:test-split -->
 BM25, k = 3 pages, 46 answerable test questions (49 on dev); 95% bootstrap intervals in brackets. Answers from llama3.2:3b (Ollama 0.40.5) on MacBook Pro 13-inch 2019, Intel Core i5-8257U 1.4 GHz (4 cores), 8 GB, macOS 15.7, no GPU; test split scored 2026-11-02.
