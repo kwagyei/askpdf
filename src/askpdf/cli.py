@@ -192,7 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--machine",
         default=None,
-        help="for answers: a label for this machine, recorded with the results",
+        help="a label for this machine, recorded with answers results",
     )
     evaluate.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     bench = commands.add_parser("bench", help="time indexing, search and answers on this machine")
@@ -613,6 +613,7 @@ def _eval_answers(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
         provenance = {"model": ollama.CHAT_MODEL, **ollama.server_info(url, ollama.CHAT_MODEL)}
     except http.ProviderError as exc:
         raise ValueError(f"{exc}; the answers stage needs Ollama running") from exc
+    run_record = _run_record(args.machine, args.eval_dir)  # the commit the run starts from
     snapshot = retrieval.load_corpus_snapshot(args.eval_dir / "corpus")
 
     def chat(question: str, hits: Sequence[PageHit]) -> ollama.OllamaChat:
@@ -639,7 +640,7 @@ def _eval_answers(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
         "retriever": "bm25",
         "k": ANSWER_K,
         **provenance,
-        **_run_record(args.machine, args.eval_dir),
+        **run_record,
         **result,
         "per_question": dict(sorted(records.items())),
     }
