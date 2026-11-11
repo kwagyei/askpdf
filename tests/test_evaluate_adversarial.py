@@ -324,17 +324,22 @@ def test_release_pattern_is_ascii_only(tmp_path: Path) -> None:
 
 @in_repo
 def test_results_do_not_depend_on_where_the_eval_directory_lives(tmp_path: Path) -> None:
-    """Copy with files created in reverse order: BM25 ties must not follow directory order."""
+    """Copy with files created in reverse order: BM25 ties must not follow directory order.
+
+    Compared with a run on the repository's own eval/, not with the committed results:
+    those match only under the pinned pypdf (eval/constraints.txt), which the evaluation
+    gate installs and this job does not.
+    """
     dest = tmp_path / "somewhere" / "else"
     (dest / "corpus").mkdir(parents=True)
     for pdf in sorted((EVAL / "corpus").iterdir(), reverse=True):
         shutil.copy(pdf, dest / "corpus" / pdf.name)
     shutil.copytree(EVAL / "questions", dest / "questions")
     shutil.copytree(EVAL / "conversations", dest / "conversations")
-    out = tmp_path / "r.json"
-    assert main(["eval", "retrieval", "--eval-dir", str(dest), "--json", str(out)]) == 0
-    committed = json.loads((EVAL / "results" / "dev-retrieval-bm25.json").read_text("utf-8"))
-    assert json.loads(out.read_text("utf-8")) == committed
+    here, there = tmp_path / "here.json", tmp_path / "there.json"
+    assert main(["eval", "retrieval", "--eval-dir", str(EVAL), "--json", str(here)]) == 0
+    assert main(["eval", "retrieval", "--eval-dir", str(dest), "--json", str(there)]) == 0
+    assert json.loads(there.read_text("utf-8")) == json.loads(here.read_text("utf-8"))
 
 
 @in_repo

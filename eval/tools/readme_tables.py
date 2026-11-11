@@ -100,8 +100,8 @@ def answers() -> str:
     gi = g["grounded_interval_95"]
     return (
         f"Answers from {an['model']} (Ollama {an['ollama_version']}) on the"
-        f" {an['n_questions']} dev questions, {an['k']} BM25 pages each; {_machine()},"
-        f" {DEV_ANSWERS_DATE}:\n\n"
+        f" {an['n_questions']} dev questions, {an['k']} BM25 pages each; {_machine(an)},"
+        f" {_date(an, DEV_ANSWERS_DATE)}:\n\n"
         "| Measure | Result |\n| --- | --- |\n"
         f"| Citations with a quote found on the cited page |"
         f" {round(g['quote_verified_rate'] * g['n_citations'])} of {g['n_citations']}"
@@ -121,14 +121,21 @@ def answers() -> str:
 
 
 RELEASE = "v0.1.0"
-# When the model runs were made; the results files predate a date field. All on the
-# machine named in bench-v0.1.0.json.
+# Model runs from v0.1.1 on record their own date, machine and git commit. These are for
+# the two files made before that (dev-answers.json, test-v0.1.0.json), all on the machine
+# named in bench-v0.1.0.json; delete them once both have been re-run.
 DEV_ANSWERS_DATE = "2026-10-31"
 TEST_SPLIT_DATE = "2026-11-02"
 
 
-def _machine() -> str:
+def _machine(run: dict[str, Any] | None = None) -> str:
+    if run and "machine" in run:
+        return str(run["machine"])
     return str(_load(f"bench-{RELEASE}.json")["machine"])
+
+
+def _date(run: dict[str, Any], before_dates: str) -> str:
+    return str(run.get("date", before_dates))
 
 
 def _interval(iv: list[float]) -> str:
@@ -186,8 +193,8 @@ def test_split() -> str:
     table = "\n".join(f"| {a} | {b} | {c} |" for a, b, c in rows)
     model = test.get("answers", {})
     run = (
-        f" Answers from {model['model']} (Ollama {model['ollama_version']}) on {_machine()};"
-        f" test split scored {TEST_SPLIT_DATE}."
+        f" Answers from {model['model']} (Ollama {model['ollama_version']})"
+        f" on {_machine(model)}; test split scored {_date(model, TEST_SPLIT_DATE)}."
         if model
         else ""
     )

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `askpdf eval answers` and `askpdf bench` record the date, the machine (`--machine` to
+  label it) and the git commit, marked `-dirty` when tracked files had changed. The README
+  tables take the date and machine from the results file instead of constants.
+  `eval --check` ignores these three fields and still compares every score.
+
 ## v0.1.1 (2026-11-04)
 
 Fixes from the v0.1.0 code and design reviews. Search, answers and every test-split
