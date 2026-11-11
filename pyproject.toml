@@ -27,7 +27,9 @@ classifiers = [
 ]
 # Runtime dependencies are deliberately few (ADR-0001). Everything else is stdlib.
 dependencies = [
-    "pypdf>=6.0",
+    # Below 7 until the evaluation is re-run on it: pypdf 7.0 extracts some pages
+    # differently, which moves retrieval rankings (eval/constraints.txt pins the exact one).
+    "pypdf>=6.0,<7",
     "numpy>=2.5",  # the reason for the >=3.12 floor
     "fastapi>=0.120",
     "uvicorn>=0.38",

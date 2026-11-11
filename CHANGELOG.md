@@ -6,6 +6,9 @@
   label it) and the git commit, marked `-dirty` when tracked files had changed. The README
   tables take the date and machine from the results file instead of constants.
   `eval --check` ignores these three fields and still compares every score.
+- pypdf is capped below 7. pypdf 7.0 changes how some pages are extracted, which moves
+  retrieval rankings away from the published results. The cap stays until the evaluation
+  is re-run on it.
 
 ## v0.1.1 (2026-11-04)
 
