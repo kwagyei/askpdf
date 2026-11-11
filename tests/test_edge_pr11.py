@@ -305,7 +305,15 @@ def test_bench_accepts_zero_answers_and_records_the_version(
 
     assert printed["askpdf"] == __version__
     assert printed["indexing"]["documents"] == len(list((eval_dir / "corpus").glob("*.pdf")))
-    assert set(printed) == {"askpdf", "date", "machine", "python", "indexing", "search_ms"}
+    assert set(printed) == {
+        "askpdf",
+        "date",
+        "machine",
+        "git_commit",
+        "python",
+        "indexing",
+        "search_ms",
+    }
 
 
 @in_repo

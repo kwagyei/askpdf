@@ -13,8 +13,10 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import sqlite3
+import subprocess
 import sys
 import threading
 import unicodedata
@@ -186,6 +188,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument(
         "--rrf-k", type=_positive, default=RRF_K, metavar="N", help="RRF constant for hybrid"
+    )
+    evaluate.add_argument(
+        "--machine",
+        default=None,
+        help="for answers: a label for this machine, recorded with the results",
     )
     evaluate.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     bench = commands.add_parser("bench", help="time indexing, search and answers on this machine")
@@ -456,8 +463,9 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, exc)
     if args.check and release is not None:
         # The release workflow: a fresh run must reproduce the frozen numbers exactly.
-        committed = release["stages"][args.stage]
-        fresh = json.loads(json.dumps(summary))  # the types the file holds (lists, not tuples)
+        # When, where and from which commit say nothing about the scores, so they never differ.
+        committed = _without_run(release["stages"][args.stage])
+        fresh = _without_run(json.loads(json.dumps(summary)))  # the file's types (lists)
         if fresh != committed:
             changed = sorted(
                 k for k in fresh.keys() | committed.keys() if fresh.get(k) != committed.get(k)
@@ -476,6 +484,51 @@ def cmd_eval(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
     except OSError as exc:
         return _error(err, f"cannot write the results: {exc.strerror or exc}")
     return 0
+
+
+RUN_RECORD = ("date", "machine", "git_commit")
+
+
+def _run_record(machine: str | None, where: Path) -> dict[str, Any]:
+    """When, on what and from which commit a run was made (ADR-0007 Amendment 1)."""
+    import datetime
+    import platform
+
+    return {
+        "date": datetime.date.today().isoformat(),
+        "machine": machine or platform.platform(),
+        "git_commit": _git_commit(where),
+    }
+
+
+def _git_commit(where: Path) -> str | None:
+    """The checkout's commit, "-dirty" if tracked files changed; None outside git."""
+
+    found = shutil.which("git")
+    if found is None:
+        return None
+
+    def git(*args: str) -> str:
+        # Fixed arguments to the git on PATH; nothing here comes from a user's input.
+        done = subprocess.run(  # noqa: S603
+            [found, "-C", str(where), *args],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        return done.stdout.strip()
+
+    try:
+        commit = git("rev-parse", "--verify", "HEAD")
+        dirty = git("status", "--porcelain", "--untracked-files=no")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return f"{commit}-dirty" if dirty else commit
+
+
+def _without_run(summary: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in summary.items() if k not in RUN_RECORD}
 
 
 def _write_json(path: Path, data: object) -> None:
@@ -586,6 +639,7 @@ def _eval_answers(args: argparse.Namespace, out: TextIO) -> dict[str, Any]:
         "retriever": "bm25",
         "k": ANSWER_K,
         **provenance,
+        **_run_record(args.machine, args.eval_dir),
         **result,
         "per_question": dict(sorted(records.items())),
     }
@@ -1038,7 +1092,6 @@ class _Stdout(io.TextIOBase):
 
 
 def cmd_bench(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
-    import datetime
     import platform
 
     from askpdf import bench
@@ -1055,8 +1108,7 @@ def cmd_bench(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         return _error(err, f"cannot read {path}: {exc}")
     result: dict[str, Any] = {
         "askpdf": __version__,
-        "date": datetime.date.today().isoformat(),
-        "machine": args.machine or platform.platform(),
+        **_run_record(args.machine, args.eval_dir),
         "python": platform.python_version(),
     }
     print(f"indexing {len(pdfs)} documents, {args.runs} runs", file=err)

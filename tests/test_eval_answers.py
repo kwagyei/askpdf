@@ -1,5 +1,6 @@
 """Stages (c) and (e): grounding and abstention numbers from answer records."""
 
+import datetime
 import shutil
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -145,9 +146,13 @@ def test_the_stage_end_to_end_with_a_fake_model(
         monkeypatch.setenv("ASKPDF_OLLAMA_URL", url)
         models.chat_reply = ["NOT_FOUND"]
         out = tmp_path / "answers.json"
-        assert main(["eval", "answers", "--eval-dir", str(eval_dir), "--json", str(out)]) == 0
+        args = ["eval", "answers", "--eval-dir", str(eval_dir), "--json", str(out)]
+        assert main([*args, "--machine", "test box"]) == 0
     result = json.loads(out.read_text(encoding="utf-8"))
     assert result["stage"] == "answers" and result["k"] == 3 and result["model"] == "llama3.2:3b"
+    # When, where and from which commit, so the README needs no dates of its own.
+    assert result["machine"] == "test box" and "git_commit" in result
+    assert result["date"] == datetime.date.today().isoformat()
     assert result["abstention"]["not_found_recall"] == 1.0
     assert result["abstention"]["over_abstention_rate"] == 1.0
     assert "answering 2/2" in capsys.readouterr().err
