@@ -81,6 +81,9 @@ def test_the_script_text_is_the_same_whatever_the_folder_or_message(tmp_path: Pa
         assert alert.calls[0][3:] == [text]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows forbids quotes in folder names; the app is macOS"
+)
 def test_a_hostile_folder_name_reaches_the_alert_only_as_an_argument(tmp_path: Path) -> None:
     for text in HOSTILE:
         bad = tmp_path / text.replace("/", "_")
@@ -160,6 +163,10 @@ def test_the_home_folder_is_refused_when_its_case_differs(tmp_path: Path) -> Non
     assert desktop.refusal(tmp_path / "caseprobe", tmp_path / "CaseProbe") is not None
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="chmod can't make a folder unreadable on Windows; the app is macOS",
+)
 @pytest.mark.skipif(_ROOT, reason="root reads everything")
 def test_an_unreadable_folder_from_the_command_line_is_refused_with_the_settings_path(
     tmp_path: Path,
@@ -515,6 +522,10 @@ def test_a_page_load_does_not_hang_when_ollama_swallows_the_request(
         listener.close()
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="a refused connection takes about 2 s on Windows; the app is macOS",
+)
 def test_a_closed_port_answers_fast(
     folder: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
