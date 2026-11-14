@@ -4,9 +4,12 @@ Two calls cover every provider: ``post_json`` for one request and one JSON reply
 ``stream_lines`` for replies that arrive a line at a time (Ollama's NDJSON, SSE).
 """
 
+import contextlib
 import http.client
 import ipaddress
 import json
+import socket
+import threading
 import urllib.error
 import urllib.request
 from collections.abc import Iterator, Mapping
@@ -36,9 +39,77 @@ class _NoRedirects(urllib.request.HTTPRedirectHandler):
         return None  # urllib then raises HTTPError for the 3xx answer
 
 
+# --- cutting a stream from another thread -----------------------------------------------
+# A browser can leave while a worker thread is blocked reading the model's reply, before
+# its first byte even (Ollama sends nothing until the prompt is read). Only shutting the
+# socket from outside wakes that read, so streams record their socket per thread.
+
+_LOCK = threading.Lock()
+_SOCKETS: dict[int, socket.socket] = {}  # thread id -> socket of the stream it reads
+_CUT: set[int] = set()  # threads whose stream was cut, connected yet or not
+_streaming = threading.local()
+
+
+def _register(sock: socket.socket) -> None:
+    if not getattr(_streaming, "on", False):
+        return
+    me = threading.get_ident()
+    with _LOCK:
+        _SOCKETS[me] = sock
+        cut = me in _CUT
+    if cut:  # cut while it was still connecting
+        _shut(sock)
+
+
+def _shut(sock: socket.socket) -> None:
+    with contextlib.suppress(OSError):
+        sock.shutdown(socket.SHUT_RDWR)
+
+
+def cut_stream(thread_id: int) -> None:
+    """Break off the model stream that ``thread_id`` reads or is about to open: a read
+    blocked in that thread returns, and a stream it opens later fails at once."""
+    with _LOCK:
+        _CUT.add(thread_id)
+        sock = _SOCKETS.get(thread_id)
+    if sock is not None:
+        _shut(sock)
+
+
+def forget_cut(thread_id: int) -> None:
+    """Let ``thread_id`` stream again, once whatever it was doing has been closed."""
+    with _LOCK:
+        _CUT.discard(thread_id)
+        _SOCKETS.pop(thread_id, None)
+
+
+class _TrackedHTTPConnection(http.client.HTTPConnection):
+    def connect(self) -> None:
+        super().connect()
+        _register(self.sock)
+
+
+class _TrackedHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self) -> None:
+        super().connect()
+        _register(self.sock)
+
+
+class _TrackedHTTP(urllib.request.HTTPHandler):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_TrackedHTTPConnection, req)
+
+
+class _TrackedHTTPS(urllib.request.HTTPSHandler):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_TrackedHTTPSConnection, req, context=self._context)  # type: ignore[attr-defined]
+
+
 # No proxies either: an http_proxy variable would send "local" traffic, excerpts and
 # all, through whatever host it names.
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirects())
+_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), _NoRedirects(), _TrackedHTTP(), _TrackedHTTPS()
+)
 _FAILURES = (urllib.error.URLError, OSError, http.client.HTTPException, UnicodeDecodeError)
 
 
@@ -142,10 +213,17 @@ def stream_lines(
     """Yield the reply's non-empty lines as they arrive; closing the iterator closes the
     connection. ``timeout`` bounds each wait for data, not the whole answer."""
     headers = headers or {}
+    me = threading.get_ident()
+    with _LOCK:
+        if me in _CUT:
+            raise ProviderError(f"the answer from {where(url)} was cancelled")
+    _streaming.on = True
     try:
         response = _OPENER.open(_request(url, payload, headers), timeout=timeout)
     except _FAILURES as exc:
         raise _describe(url, exc, headers) from exc
+    finally:
+        _streaming.on = False
     with response:
         try:
             for raw in response:
