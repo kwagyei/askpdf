@@ -48,7 +48,7 @@ def test_the_picker_returns_the_chosen_folder(tmp_path: Path) -> None:
 
 def test_only_the_scripts_own_newline_is_dropped(tmp_path: Path) -> None:
     run = _ran(stdout="/Users/me/odd name\n\n")  # a folder whose name ends in a newline
-    assert str(desktop.osascript_picker(tmp_path, run)) == "/Users/me/odd name\n"
+    assert desktop.osascript_picker(tmp_path, run) == Path("/Users/me/odd name\n")
 
 
 def test_cancel_is_none(tmp_path: Path) -> None:
