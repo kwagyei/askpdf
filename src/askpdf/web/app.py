@@ -75,6 +75,20 @@ START_FROM_TERMINAL = """<!doctype html>
 <p>Open askpdf with the link printed in the terminal where you started it.
 This page needs the one-time key in that link.</p></body></html>
 """
+# The same page when the Mac app started askpdf: there is no terminal to look in, and
+# opening the app again from the Dock reopens the page with its key (ADR-0013).
+START_FROM_APP = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>askpdf</title></head>
+<body><h1>askpdf</h1>
+<p>Open askpdf again from the Dock to get back to your folder.
+This page needs the one-time key that askpdf opens it with.</p></body></html>
+"""
+SEE_TERMINAL = "see the terminal"
+SEE_LOG = "see the log at ~/Library/Logs/askpdf/askpdf.log"
+EMPTY_FOLDER = (
+    "There are no PDFs in this folder yet. Add some to it and they appear here within"
+    " a few seconds."
+)
 
 
 def cookie_name(port: int) -> str:
@@ -89,8 +103,11 @@ class Guard:
     """ASGI middleware: Host allow-list, session cookie, same-origin POSTs, and the
     security headers on every response."""
 
-    def __init__(self, app: ASGIApp, port: int, token: str) -> None:
+    def __init__(self, app: ASGIApp, port: int, token: str, app_mode: bool = False) -> None:
         self.app = app
+        self.where = (
+            "open askpdf again from the Dock" if app_mode else "open the link from the terminal"
+        )
         self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         self.cookie = cookie_name(port)
         self.token = token
@@ -110,7 +127,7 @@ class Guard:
             await _plain(send, 403, "cross-origin request refused")
             return
         if path.startswith(("/api/", "/pdf/")) and not self.has_session(headers.get("cookie")):
-            await _plain(send, 403, "no askpdf session; open the link from the terminal")
+            await _plain(send, 403, f"no askpdf session; {self.where}")
             return
         no_store = not path.startswith("/static/")
 
@@ -371,6 +388,17 @@ class ClosingStream(StreamingResponse):
                 await self.body_iterator.aclose()  # type: ignore[attr-defined]
 
 
+def _pull_stream(pull: Callable[[], Iterator[dict[str, Any]]]) -> Generator[str, None, None]:
+    """The model download as server-sent events: ``progress`` while it runs, then
+    ``done`` or ``error``. Closing it (the page went away) stops the download."""
+    try:
+        for event in pull():
+            yield sse("progress", event)
+        yield sse("done", {})
+    except http.ProviderError as exc:
+        yield sse("error", {"message": str(exc)})
+
+
 def sse(event: str, data: object) -> str:
     # ASCII only: a lone surrogate (from a question, the model or a PDF) is escaped
     # instead of failing to encode as UTF-8 and killing the stream.
@@ -437,11 +465,19 @@ def create_app(
     on_start: Callable[[], None] | None = None,
     k: int = ANSWER_K,
     remote: Sequence[str] = (),
+    app_mode: bool = False,
+    model_status: Callable[[], dict[str, Any]] | None = None,
+    pull_model: Callable[[], Iterator[dict[str, Any]]] | None = None,
 ) -> ASGIApp:
     """The app, wrapped in its request checks. ``index_folder`` runs in a thread at
     start-up and reports through ``Progress``; without it the index is taken as ready.
     ``remote`` names the hosts off this machine that the models run on; the page shows
-    them in a banner for as long as it is open (ADR-0005)."""
+    them in a banner for as long as it is open (ADR-0005). ``app_mode`` words messages for
+    the Mac app, which has no terminal (ADR-0013). ``model_status`` and ``pull_model``,
+    given when answers come from a local Ollama, let the page say what is missing and
+    download the answer model."""
+    start_page = START_FROM_APP if app_mode else START_FROM_TERMINAL
+    see = SEE_LOG if app_mode else SEE_TERMINAL
     library = Library(root, index)
     progress = Progress() if index_folder else Progress(state="ready")
     conversations = Conversations()
@@ -472,7 +508,7 @@ def create_app(
         given = request.query_params.get("token")
         if given is not None:
             if not same_secret(given, token):
-                return HTMLResponse(START_FROM_TERMINAL, status_code=403)
+                return HTMLResponse(start_page, status_code=403)
             # Swap the token in the URL for a cookie, and drop it from the address bar.
             response = RedirectResponse("/", status_code=303)
             response.set_cookie(
@@ -480,12 +516,25 @@ def create_app(
             )
             return response
         if not has_session(request.headers.get("cookie"), cookie_name(port), token):
-            return HTMLResponse(START_FROM_TERMINAL, status_code=403)
+            return HTMLResponse(start_page, status_code=403)
         return HTMLResponse((STATIC / "index.html").read_text(encoding="utf-8"))
 
     @app.get("/api/docs")
     def docs() -> dict[str, Any]:
-        return {"folder": library.root.name, "remote": list(remote), **library.documents()}
+        return {
+            "folder": library.root.name,
+            "remote": list(remote),
+            "model": model_status() if model_status else None,
+            **library.documents(),
+        }
+
+    @app.post("/api/model")
+    def download_model() -> StreamingResponse:
+        # Takes no input: it can only fetch the one model askpdf answers with, from the
+        # local Ollama. The Guard has already required this page's session and origin.
+        if pull_model is None:
+            raise HTTPException(404, "answers do not come from a local Ollama")
+        return ClosingStream(closing(_pull_stream(pull_model)), media_type="text/event-stream")
 
     @app.post("/api/conversations")
     def new_conversation() -> dict[str, str]:
@@ -530,6 +579,10 @@ def create_app(
         progress.idle.clear()  # the indexer waits until this answer is written
         try:
             snapshot, ids = library.snapshot()
+            if not snapshot.paths:  # an empty folder: nothing for the model to read
+                conversations.add(cid, question)
+                yield sse("final", {**NO_ANSWER, "message": EMPTY_FOLDER})
+                return
             # Follow-ups are searched with the conversation's questions joined: the
             # "concat" condition of the conversation eval (design revision 3).
             query = " ".join([*earlier, question])
@@ -585,7 +638,7 @@ def create_app(
             yield sse("error", {"message": str(exc)})
         except Exception:
             log.exception("answering failed")
-            yield sse("error", {"message": "askpdf failed while answering; see the terminal"})
+            yield sse("error", {"message": f"askpdf failed while answering; {see}"})
         finally:
             progress.idle.set()
             answering.release()
@@ -615,4 +668,4 @@ def create_app(
             headers={"Content-Disposition": "inline", "Content-Length": str(size)},
         )
 
-    return Guard(app, port, token)
+    return Guard(app, port, token, app_mode)

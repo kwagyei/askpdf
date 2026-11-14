@@ -19,9 +19,10 @@ import sqlite3
 import subprocess
 import sys
 import threading
+import time
 import unicodedata
 import webbrowser
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO, cast
@@ -154,6 +155,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--port", type=_port, metavar="N", help="port on 127.0.0.1 (default: first free from 8765)"
     )
     serve.add_argument(
+        "--no-browser", action="store_true", help="print the link instead of opening it"
+    )
+    app = commands.add_parser(
+        "app", help="macOS: choose a folder in a dialog, then open the web app (askpdf.app)"
+    )
+    app.add_argument(
+        "path", type=Path, nargs="?", metavar="FOLDER", help="open this folder, without the dialog"
+    )
+    app.add_argument(
+        "--watch-pid",
+        type=_positive,
+        metavar="PID",
+        help="stop when this process exits (the app passes its own)",
+    )
+    app.add_argument(
+        "--port", type=_port, metavar="N", help="port on 127.0.0.1 (default: first free from 8765)"
+    )
+    app.add_argument(
         "--no-browser", action="store_true", help="print the link instead of opening it"
     )
     evaluate = commands.add_parser("eval", help="score one stage on the evaluation data")
@@ -848,6 +867,10 @@ def cmd_ask(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
 
 FIRST_PORT = 8765
+MODEL_STATUS_TTL = 30.0  # seconds between checks of Ollama, once the model is there
+MODEL_STATUS_RETRY = 5.0
+SHUTDOWN_GRACE = 3  # seconds an open stream may hold up stopping the server
+WATCH_PID_EVERY = 2.0
 
 
 def free_port(first: int = FIRST_PORT, tries: int = 50) -> int | None:
@@ -970,7 +993,57 @@ def _retriever(args: argparse.Namespace) -> Callable[[Snapshot, str, int], Searc
     return retrieve
 
 
+def cmd_app(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    """The Mac app's command: a folder dialog, then the same web app as ``serve``, worded for
+    an app with no terminal (ADR-0013). To change folder, quit and open the app again."""
+    if sys.platform != "darwin":
+        print("askpdf: error: askpdf app is for macOS; use askpdf FOLDER instead", file=err)
+        return 2
+    from askpdf import desktop
+
+    home = Path.home()
+    if args.path is None:
+        try:
+            folder = desktop.choose_folder(desktop.osascript_picker, desktop.osascript_alert, home)
+        except desktop.DialogError as exc:
+            return _error(err, f"could not show the folder dialog: {exc}")
+        if folder is None:
+            print("no folder chosen", file=err)
+            return 0
+    else:
+        folder = args.path
+        reason = desktop.refusal(folder, home)
+        if reason is not None:
+            return _error(err, reason)
+    serve = build_parser().parse_args(["serve", str(folder)])
+    serve.port, serve.no_browser = args.port, args.no_browser
+    return _serve(serve, out, err, app_mode=True, watch_pid=args.watch_pid)
+
+
 def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
+    return _serve(args, out, err)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists, under another user
+    return True
+
+
+def _serve(
+    args: argparse.Namespace,
+    out: TextIO,
+    err: TextIO,
+    *,
+    app_mode: bool = False,
+    watch_pid: int | None = None,
+) -> int:
+    import signal
+
     import uvicorn  # only the web app needs the server
 
     from askpdf.web.app import create_app
@@ -1000,9 +1073,28 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
     def started() -> None:
         print(f"askpdf is running at {url}", file=out, flush=True)
-        print("press Ctrl-C to stop", file=err, flush=True)
+        stop = "quit askpdf from the Dock to stop" if app_mode else "press Ctrl-C to stop"
+        print(stop, file=err, flush=True)
         if not args.no_browser:
             webbrowser.open(url)
+
+    local = not args.api_url  # the page can say what Ollama lacks, and fetch the model
+    chat_model = args.model or ollama.CHAT_MODEL
+    status_cache: dict[str, Any] = {}
+
+    def model_status() -> dict[str, Any]:
+        # Asked on every page load, so cached: Ollama is checked at most every 30 s.
+        # Until the model is there, every 5 s, so the banner goes soon after a download.
+        now = time.monotonic()
+        last = status_cache.get("value")
+        ttl = MODEL_STATUS_TTL if last and last["pulled"] else MODEL_STATUS_RETRY
+        if last is None or now - status_cache["at"] > ttl:
+            status_cache.update(at=now, value=ollama.model_status(ollama.base_url(), chat_model))
+        return dict(status_cache["value"])
+
+    def pull_model() -> Iterator[dict[str, Any]]:
+        yield from ollama.pull(ollama.base_url(), chat_model)
+        status_cache.clear()  # so the page stops offering the download at once
 
     app = create_app(
         root=args.path,
@@ -1014,10 +1106,35 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         index_folder=_index_in_background(args, err),
         on_start=started,
         remote=_remote_hosts(args),
+        app_mode=app_mode,
+        model_status=model_status if local else None,
+        pull_model=pull_model if local else None,
     )
-    # 127.0.0.1 only, with no option to change it (ADR-0008).
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    # 127.0.0.1 only, with no option to change it (ADR-0008). An open /api/events stream
+    # would hold a graceful shutdown forever, so it gets a few seconds.
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        timeout_graceful_shutdown=SHUTDOWN_GRACE,
+    )
     server = uvicorn.Server(config)
+    if hasattr(signal, "SIGUSR1") and threading.current_thread() is threading.main_thread():
+        # Opening the app again while it runs sends SIGUSR1: show the page again.
+        signal.signal(signal.SIGUSR1, lambda *_: webbrowser.open(url))
+    if watch_pid is not None:
+        # Stop with the app, even if it was force-quit, so no orphan keeps the index's
+        # writer lock and the port.
+        def watch() -> None:
+            while not server.should_exit:
+                if not _alive(watch_pid):
+                    print("the app has quit; stopping", file=err, flush=True)
+                    server.should_exit = True
+                    return
+                time.sleep(WATCH_PID_EVERY)
+
+        threading.Thread(target=watch, name="askpdf-watch-app", daemon=True).start()
     server.run()
     return 0 if server.started else _error(err, f"could not listen on port {port}")
 
@@ -1154,6 +1271,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "ask": cmd_ask,
         "eval": cmd_eval,
         "serve": cmd_serve,
+        "app": cmd_app,
         "bench": cmd_bench,
     }
     if argv and argv[0] not in commands and not argv[0].startswith("-"):

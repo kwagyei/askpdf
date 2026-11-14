@@ -63,6 +63,8 @@ a { color: var(--accent); }
   flex-basis: 100%; margin: 0; padding: 6px 10px;
   background: var(--warn-bg); border-radius: 8px; font-size: 0.9rem;
 }
+.model { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.model[hidden] { display: none; }
 
 button {
   font: inherit; cursor: pointer;
