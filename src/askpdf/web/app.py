@@ -22,12 +22,14 @@ import secrets
 import stat
 import threading
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Generator, Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, cast
 
+import anyio
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
@@ -319,6 +321,48 @@ class Conversations:
 # --- serialising events --------------------------------------------------------------------
 
 
+_END = object()
+
+
+async def closing(stream: Generator[str, None, None]) -> AsyncIterator[str]:
+    """Serve a blocking generator from a worker thread, and close it when the response
+    ends for any reason, the browser disconnecting included.
+
+    Starlette stops iterating a synchronous stream when the client goes away but never
+    closes it, so its ``finally`` never ran: the answering lock stayed held and every
+    later question was refused, and the open stream kept Ollama generating to the end.
+    Closing it unwinds the model's HTTP stream, which is how Ollama learns to stop.
+    """
+    # One worker per answer runs the pieces in order, so the close queues behind a piece
+    # still being read: a generator must never be closed while another thread runs it.
+    worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="askpdf-answer")
+    try:
+        while True:
+            piece = await asyncio.wrap_future(worker.submit(next, stream, _END))
+            if piece is _END:
+                return
+            yield cast(str, piece)
+    finally:
+        done = worker.submit(stream.close)
+        worker.shutdown(wait=False)
+        with anyio.CancelScope(shield=True):
+            await asyncio.wrap_future(done)
+
+
+class ClosingStream(StreamingResponse):
+    """A streaming response that closes its stream when it ends, so a disconnect that
+    lands while a piece is being sent still runs the stream's ``finally``."""
+
+    body_iterator: AsyncIterator[str]
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            with anyio.CancelScope(shield=True):
+                await self.body_iterator.aclose()  # type: ignore[attr-defined]
+
+
 def sse(event: str, data: object) -> str:
     # ASCII only: a lone surrogate (from a question, the model or a PDF) is escaped
     # instead of failing to encode as UTF-8 and killing the stream.
@@ -466,12 +510,12 @@ def create_app(
         question = body.question.strip()
         if not question:
             raise HTTPException(422, "the question is empty")
-        return StreamingResponse(
-            _answer_stream(question, earlier, body.conversation_id),
+        return ClosingStream(
+            closing(_answer_stream(question, earlier, body.conversation_id)),
             media_type="text/event-stream",
         )
 
-    def _answer_stream(question: str, earlier: list[str], cid: str) -> Iterator[str]:
+    def _answer_stream(question: str, earlier: list[str], cid: str) -> Generator[str, None, None]:
         if not answering.acquire(blocking=False):
             yield sse("error", {"message": "another question is being answered; try again"})
             return

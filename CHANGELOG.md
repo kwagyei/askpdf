@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Closing the browser tab mid-answer no longer leaves askpdf refusing every later
+  question ("another question is being answered") until it is restarted, and Ollama now
+  stops generating within a token or two instead of finishing the answer for no one.
 - `askpdf eval answers` and `askpdf bench` record the date, the machine (`--machine` to
   label it) and the git commit, marked `-dirty` when tracked files had changed. The README
   tables take the date and machine from the results file instead of constants.
