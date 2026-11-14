@@ -89,6 +89,10 @@ EMPTY_FOLDER = (
     "There are no PDFs in this folder yet. Add some to it and they appear here within"
     " a few seconds."
 )
+STILL_READING = "askpdf is still reading this folder. Ask again once its first PDF is ready."
+NONE_READABLE = (
+    "None of the PDFs in this folder could be read; the list of documents says why for each."
+)
 
 
 def cookie_name(port: int) -> str:
@@ -388,6 +392,16 @@ class ClosingStream(StreamingResponse):
                 await self.body_iterator.aclose()  # type: ignore[attr-defined]
 
 
+def _nothing_to_read(library: Library, progress: Progress) -> str:
+    """Why there is no page to answer from: the folder is still being read, every PDF in
+    it failed, or it has none."""
+    if progress.view()["state"] == "indexing":
+        return STILL_READING
+    if library.documents()["failed"]:
+        return NONE_READABLE
+    return EMPTY_FOLDER
+
+
 def _pull_stream(pull: Callable[[], Iterator[dict[str, Any]]]) -> Generator[str, None, None]:
     """The model download as server-sent events: ``progress`` while it runs, then
     ``done`` or ``error``. Closing it (the page went away) stops the download."""
@@ -579,9 +593,9 @@ def create_app(
         progress.idle.clear()  # the indexer waits until this answer is written
         try:
             snapshot, ids = library.snapshot()
-            if not snapshot.paths:  # an empty folder: nothing for the model to read
+            if not snapshot.paths:  # nothing indexed yet: no page for the model to read
                 conversations.add(cid, question)
-                yield sse("final", {**NO_ANSWER, "message": EMPTY_FOLDER})
+                yield sse("final", {**NO_ANSWER, "message": _nothing_to_read(library, progress)})
                 return
             # Follow-ups are searched with the conversation's questions joined: the
             # "concat" condition of the conversation eval (design revision 3).

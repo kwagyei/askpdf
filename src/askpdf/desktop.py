@@ -58,12 +58,20 @@ def osascript_alert(message: str, run: Run = _run) -> None:
     run(["/usr/bin/osascript", "-e", _ALERT, message])
 
 
+def _same(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:  # one of them does not exist
+        return False
+
+
 def refusal(folder: Path, home: Path) -> str | None:
     """Why ``folder`` can't be opened, or None if it can."""
     real = Path(os.path.realpath(folder))
-    if real == Path(real.anchor):
+    # samefile, not ==: APFS ignores case, so /Users/ME is the home folder too.
+    if _same(real, Path(real.anchor)):
         what = "your whole disk"
-    elif real == Path(os.path.realpath(home)):
+    elif _same(real, home):
         what = "your whole home folder"
     else:
         try:

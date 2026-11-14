@@ -150,7 +150,9 @@ def model_status(url: str = DEFAULT_URL, model: str = CHAT_MODEL) -> dict[str, A
         tags = http.get_json(f"{url}/api/tags", timeout=2.0)
     except http.ProviderError:
         return {"running": False, "model": model, "pulled": False}
-    names = {e.get("name") for e in tags.get("models", [])} if isinstance(tags, dict) else set()
+    models = tags.get("models") if isinstance(tags, dict) else None
+    entries = models if isinstance(models, list) else []  # a null list breaks nothing
+    names = {e.get("name") for e in entries if isinstance(e, dict)}
     return {"running": True, "model": model, "pulled": bool(names & {model, f"{model}:latest"})}
 
 

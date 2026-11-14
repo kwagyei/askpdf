@@ -145,7 +145,10 @@ async function pullModel() {
       }
     }
   } catch (error) {
+    // Left on screen: reloading the banner now would replace it with the plain offer.
     text.textContent = `The download stopped: ${error.message}. Try again.`;
+    button.hidden = false;
+    return;
   } finally {
     pulling = false;
     button.disabled = false;
@@ -367,13 +370,13 @@ $("question").addEventListener("keydown", (event) => {
 });
 
 $("new-chat").addEventListener("click", async () => {
-  $("model-pull").addEventListener("click", pullModel);
-
-conversationReady = newConversation();
+  conversationReady = newConversation();
   await conversationReady;
   $("log").replaceChildren();
   $("question").focus();
 });
+
+$("model-pull").addEventListener("click", pullModel);
 
 conversationReady = newConversation();
 loadDocs().catch(() => {});
