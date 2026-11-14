@@ -548,8 +548,13 @@ def create_app(
         f, size = opened
 
         def chunks() -> Iterator[bytes]:
-            with f:  # streamed, so a large PDF is never held in memory whole
-                while chunk := f.read(CHUNK_BYTES):
+            # Streamed, so a large PDF is never held in memory whole. Exactly `size` bytes,
+            # the Content-Length already sent: a file growing while it is served would
+            # otherwise send more than promised.
+            left = size
+            with f:
+                while left > 0 and (chunk := f.read(min(CHUNK_BYTES, left))):
+                    left -= len(chunk)
                     yield chunk
 
         return StreamingResponse(

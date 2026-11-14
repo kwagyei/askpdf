@@ -1,0 +1,11 @@
+# The tools that build the released wheel and sdist, pinned so a release job (the one job
+# with write access) installs exactly what was last checked. PIP_CONSTRAINT carries these
+# into build's isolated environment too, which is where hatchling is installed.
+pip==26.3
+build==1.6.1
+packaging==26.3
+pyproject_hooks==1.3.3
+hatchling==1.33.0
+pathspec==1.1.1
+pluggy==1.7.0
+trove-classifiers==2026.9.21.13
