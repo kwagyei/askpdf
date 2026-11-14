@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
 
-SCHEMA_VERSION = 2  # 2: chunk ids are never reused
+SCHEMA_VERSION = 3  # 2: chunk ids are never reused; 3: nor are file ids
 
 _SCHEMA = """
 CREATE TABLE meta (
@@ -29,7 +29,10 @@ CREATE TABLE meta (
 );
 -- One row per file in the folder. Several files may share a document (copies).
 CREATE TABLE files (
-    path     TEXT PRIMARY KEY,           -- relative to the indexed root, '/'-separated
+    -- AUTOINCREMENT: the web app links to /pdf/{id}, so an id is never given to another
+    -- file after a delete, and an old link cannot open a different PDF.
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    path     TEXT NOT NULL UNIQUE,       -- relative to the indexed root, '/'-separated
     sha256   TEXT NOT NULL,
     size     INTEGER NOT NULL,
     mtime_ns INTEGER NOT NULL,
@@ -402,10 +405,13 @@ class Store:
         self._db.execute("BEGIN IMMEDIATE")
         try:
             yield
+            # Inside the try: a COMMIT that fails (the disk is full, say) must not leave the
+            # transaction open, or the next BEGIN on this connection fails as well.
+            self._db.execute("COMMIT")
         except BaseException:
-            self._db.execute("ROLLBACK")
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
             raise
-        self._db.execute("COMMIT")
 
     # --- meta ------------------------------------------------------------------
 
@@ -481,14 +487,14 @@ class Store:
 
     def file_ids(self) -> dict[str, int]:
         """Path -> id of every indexed file. The web app links to ``/pdf/{id}``, so no
-        request ever carries a path. An id survives re-indexing the same path; after a
-        delete, the id of the newest row may be given to the next new file."""
-        return dict(self._db.execute("SELECT path, rowid FROM files WHERE status = 'indexed'"))
+        request ever carries a path. An id survives re-indexing the same path and is never
+        given to another file."""
+        return dict(self._db.execute("SELECT path, id FROM files WHERE status = 'indexed'"))
 
     def file_path(self, file_id: int) -> str | None:
         """The relative path of an indexed file, by its id."""
         row = self._db.execute(
-            "SELECT path FROM files WHERE rowid = ? AND status = 'indexed'", (file_id,)
+            "SELECT path FROM files WHERE id = ? AND status = 'indexed'", (file_id,)
         ).fetchone()
         return None if row is None else str(row[0])
 

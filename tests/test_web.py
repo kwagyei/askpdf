@@ -957,3 +957,17 @@ def test_a_document_summary_is_answered_plainly_without_the_model(folder: Path) 
     assert [n for n, _ in events] == ["final"]
     assert events[0][1]["message"].startswith("askpdf cannot summarise a whole document yet.")
     assert chat.users == []
+
+
+def test_a_pdf_that_grows_while_served_sends_only_the_promised_bytes(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+
+    from askpdf.web.app import Library
+
+    # The size was read before the file grew: Content-Length says 40, the file now has 100.
+    monkeypatch.setattr(Library, "pdf", lambda self, file_id: (io.BytesIO(b"x" * 100), 40))
+    response = client.get("/pdf/1")
+    assert response.headers["content-length"] == "40"
+    assert response.content == b"x" * 40

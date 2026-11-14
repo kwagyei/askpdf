@@ -9,6 +9,11 @@
 - pypdf is capped below 7. pypdf 7.0 changes how some pages are extracted, which moves
   retrieval rankings away from the published results. The cap stays until the evaluation
   is re-run on it.
+- A citation link can no longer open a different PDF: file ids are never reused after a
+  delete (index schema 3; an older index is rebuilt on first use).
+- A PDF that grows while being served is cut at the length announced in Content-Length.
+- A transaction whose COMMIT fails is rolled back instead of left open.
+- The release job installs pinned build tools (`.github/release-constraints.txt`).
 
 ## v0.1.1 (2026-11-04)
 
