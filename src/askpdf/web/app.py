@@ -336,17 +336,25 @@ async def closing(stream: Generator[str, None, None]) -> AsyncIterator[str]:
     # One worker per answer runs the pieces in order, so the close queues behind a piece
     # still being read: a generator must never be closed while another thread runs it.
     worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="askpdf-answer")
+    thread_id = await asyncio.wrap_future(worker.submit(threading.get_ident))
+    finished = False
     try:
         while True:
             piece = await asyncio.wrap_future(worker.submit(next, stream, _END))
             if piece is _END:
+                finished = True
                 return
             yield cast(str, piece)
     finally:
+        if not finished:
+            # The worker may be blocked reading the model's reply, possibly for minutes
+            # before the first token: cut the socket from here so that read returns.
+            http.cut_stream(thread_id)
         done = worker.submit(stream.close)
         worker.shutdown(wait=False)
         with anyio.CancelScope(shield=True):
             await asyncio.wrap_future(done)
+        http.forget_cut(thread_id)
 
 
 class ClosingStream(StreamingResponse):
