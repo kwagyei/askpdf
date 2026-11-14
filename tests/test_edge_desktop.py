@@ -48,6 +48,8 @@ HOSTILE = [
     "tab\there",
 ]
 
+_ROOT = hasattr(os, "geteuid") and os.geteuid() == 0  # Windows has no geteuid
+
 
 def _recorder(code: int = 0, stderr: str = "") -> Any:
     calls: list[list[str]] = []
@@ -99,7 +101,7 @@ def test_a_hostile_folder_name_reaches_the_alert_only_as_an_argument(tmp_path: P
             desktop.choose_folder(pick, alert, tmp_path)
         finally:
             bad.chmod(0o700)
-        if os.geteuid() == 0:
+        if _ROOT:
             continue
         (call,) = run.calls
         assert call[2] == desktop._ALERT
@@ -158,7 +160,7 @@ def test_the_home_folder_is_refused_when_its_case_differs(tmp_path: Path) -> Non
     assert desktop.refusal(tmp_path / "caseprobe", tmp_path / "CaseProbe") is not None
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root reads everything")
+@pytest.mark.skipif(_ROOT, reason="root reads everything")
 def test_an_unreadable_folder_from_the_command_line_is_refused_with_the_settings_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
