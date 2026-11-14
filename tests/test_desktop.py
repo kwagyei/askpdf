@@ -190,6 +190,7 @@ def test_app_serves_the_chosen_folder_worded_for_the_app(
     assert config.timeout_graceful_shutdown == cli.SHUTDOWN_GRACE
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.kill(pid, 0) is Ctrl-C on Windows")
 def test_alive() -> None:
     assert cli._alive(os.getpid())
     child = subprocess.Popen([sys.executable, "-c", "pass"])

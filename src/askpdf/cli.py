@@ -1025,6 +1025,8 @@ def cmd_serve(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
 
 def _alive(pid: int) -> bool:
+    """Whether process ``pid`` exists. POSIX only: on Windows, signal 0 is Ctrl-C, and
+    ``--watch-pid`` belongs to ``askpdf app``, which runs on macOS alone."""
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
