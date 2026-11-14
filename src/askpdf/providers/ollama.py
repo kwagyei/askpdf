@@ -142,3 +142,25 @@ def server_info(url: str = DEFAULT_URL, model: str = EMBED_MODEL) -> dict[str, s
         if entry.get("name") in {model, f"{model}:latest"}:
             info["model_digest"] = str(entry.get("digest", "?"))
     return info
+
+
+def model_status(url: str = DEFAULT_URL, model: str = CHAT_MODEL) -> dict[str, Any]:
+    """Whether Ollama answers at ``url`` and has ``model``, for the page's banner."""
+    try:
+        tags = http.get_json(f"{url}/api/tags", timeout=2.0)
+    except http.ProviderError:
+        return {"running": False, "model": model, "pulled": False}
+    models = tags.get("models") if isinstance(tags, dict) else None
+    entries = models if isinstance(models, list) else []  # a null list breaks nothing
+    names = {e.get("name") for e in entries if isinstance(e, dict)}
+    return {"running": True, "model": model, "pulled": bool(names & {model, f"{model}:latest"})}
+
+
+def pull(url: str = DEFAULT_URL, model: str = CHAT_MODEL) -> Iterator[dict[str, Any]]:
+    """Ask Ollama to download ``model``, yielding its progress: ``status``, and while a layer
+    downloads, ``completed`` and ``total`` bytes. Ends after Ollama says "success"."""
+    for line in http.stream_lines(f"{url}/api/pull", {"model": model, "stream": True}):
+        event = _json(line)
+        if "error" in event:
+            raise http.ProviderError(f"Ollama could not download {model}: {event['error']}")
+        yield {k: event[k] for k in ("status", "completed", "total") if k in event}

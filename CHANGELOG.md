@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `askpdf app` (macOS): a folder dialog, then the same page as `askpdf FOLDER`, worded for
+  the coming Mac app (ADR-0013). It refuses your whole disk or home folder, stops when the app
+  that started it quits, and shows the page again when the app is reopened.
+- The page says when Ollama isn't running or the answer model isn't downloaded, and offers a
+  "Download the answer model" button with progress. A folder with no PDFs says so, and a
+  question there is answered without the model.
+- Stopping the server takes at most 3 s, even with the page open.
 - Closing the browser tab mid-answer no longer leaves askpdf refusing every later
   question ("another question is being answered") until it is restarted, and Ollama now
   stops generating within a token or two instead of finishing the answer for no one.

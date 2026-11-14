@@ -73,6 +73,7 @@ async function loadDocs() {
     ? `Your questions and excerpts of your documents are sent to ${data.remote.join(" and ")}, ` +
       "which is not this machine."
     : "";
+  showModel(data.model);
   const docs = $("docs");
   docs.replaceChildren();
   for (const doc of data.documents) {
@@ -87,7 +88,72 @@ async function loadDocs() {
   for (const f of data.failed) failed.append(el("li", "", `${f.path}: ${f.reason}`));
   const n = data.documents.length;
   $("doc-count").textContent = `(${n})`;
+  if (n === 0 && data.failed.length === 0) {
+    docs.append(el("li", "muted", "No PDFs in this folder yet."));
+  }
   return n;
+}
+
+// --- the answer model: is Ollama there, and has it got the model? ---------------------------
+
+let pulling = false;
+
+function showModel(model) {
+  const box = $("model");
+  const button = $("model-pull");
+  if (pulling) return; // the download reports its own progress
+  if (!model || (model.running && model.pulled)) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  if (!model.running) {
+    $("model-text").textContent =
+      "Answers need Ollama, which isn't running. Open the Ollama app, then reload this page.";
+    button.hidden = true;
+  } else {
+    $("model-text").textContent =
+      `Answers need the model ${model.model} (about 2 GB), which Ollama hasn't downloaded yet.`;
+    button.hidden = false;
+  }
+}
+
+function megabytes(n) {
+  return `${Math.round(n / 1e6).toLocaleString()} MB`;
+}
+
+async function pullModel() {
+  const button = $("model-pull");
+  const text = $("model-text");
+  pulling = true;
+  button.disabled = true;
+  text.textContent = "Starting the download…";
+  try {
+    const response = await post("/api/model");
+    if (!response.ok) throw new Error(`askpdf answered ${response.status}`);
+    for await (const { name, data } of events(response)) {
+      if (name === "progress") {
+        text.textContent =
+          data.total && data.completed !== undefined
+            ? `Downloading the answer model: ${megabytes(data.completed)} of ${megabytes(data.total)}`
+            : `Downloading the answer model: ${data.status}…`;
+      } else if (name === "done") {
+        text.textContent = "The answer model is ready.";
+        button.hidden = true;
+      } else if (name === "error") {
+        throw new Error(data.message);
+      }
+    }
+  } catch (error) {
+    // Left on screen: reloading the banner now would replace it with the plain offer.
+    text.textContent = `The download stopped: ${error.message}. Try again.`;
+    button.hidden = false;
+    return;
+  } finally {
+    pulling = false;
+    button.disabled = false;
+  }
+  await loadDocs().catch(() => {});
 }
 
 // The server ends this stream whenever indexing is idle and the browser reopens it a
@@ -309,6 +375,8 @@ $("new-chat").addEventListener("click", async () => {
   $("log").replaceChildren();
   $("question").focus();
 });
+
+$("model-pull").addEventListener("click", pullModel);
 
 conversationReady = newConversation();
 loadDocs().catch(() => {});
